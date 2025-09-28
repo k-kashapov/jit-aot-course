@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "types.h"
+
 namespace IR {
 
 class BasicBlock;
@@ -15,80 +17,68 @@ class BasicBlock;
 class Op {
   protected:
     std::string _name;
-    Op *_parent;
     BasicBlock *_bb;
-    Op() {}
-    Op(const std::string& name) : _name(name) {}
+    Type _type;
+
+    Op() : _type(Type::EType::SI32) {};
+    Op(const std::string &name) : _name(name), _type(Type::EType::SI32) {}
 
   public:
     template <typename Ty, class... Args>
-        // requires(std::is_base_of<Op, Ty>::value)
-    static auto create(const std::string& name, Args... args) {
+    // requires(std::is_base_of<Op, Ty>::value)
+    static auto create(const std::string &name, Type ty, Args... args) {
         auto res = new Ty(args...);
         res->_name = name;
+        res->_type = ty;
         return res;
     }
 
-    virtual std::ostream& stringify(std::ostream &os, const Op& op) const = 0;
+    virtual std::ostream &stringify(std::ostream &os, const Op &op) const = 0;
+    virtual bool verify() const = 0;
 
-    friend std::ostream& operator<<(std::ostream &os, const Op& op) {
-        return op.stringify(os << '$' << op._name << " =", op);
+    friend std::ostream &operator<<(std::ostream &os, const Op &op) {
+        return op.stringify(os << '$' << op._name << '[' << op._type << "] = ", op);
     }
 
-    const std::string& getName() {
-        return _name;
-    }
+    Type getType() const { return _type; }
+    const std::string &getName() const { return _name; }
 
     virtual ~Op() {};
 };
 
-class ParamOp : public Op {
-    virtual std::ostream& stringify(std::ostream &os, const Op& op) const override {
-        return os << " ParamOp";
-    }
-};
+class BasicBlock {
+    std::list<BasicBlock *> _preds;
+    std::string _name;
+    std::list<std::unique_ptr<Op>> _ops;
+    std::list<BasicBlock *> _succs;
 
-class AddOp : public Op {
-    Op *_lhs;
-    Op *_rhs;
+    BasicBlock(std::string_view name) : _name(name) {}
+    BasicBlock(std::string_view name, std::initializer_list<Op *> ops) : _name(name) {
+        for (auto *op : ops) {
+            _ops.push_back(std::unique_ptr<Op>(op));
+        }
+    }
 
   public:
-    AddOp(Op *lhs, Op *rhs) : _lhs(lhs), _rhs(rhs) {};
+    static BasicBlock *create(std::string_view name) { return new BasicBlock(name); }
 
-    const std::vector<Op *> getInputs() const { return std::vector<Op *>{_lhs, _rhs}; }
-
-    Op *getLhs() const { return _lhs; }
-
-    Op *getRhs() const { return _rhs; }
-
-    virtual std::ostream& stringify(std::ostream &os, const Op& op) const override {
-        return os << " AddOp ($" << (_lhs ? _lhs->getName() : "nullptr") << ", $" << (_rhs ? _rhs->getName() : "nullptr") << ')';
+    static BasicBlock *create(std::string_view name, std::initializer_list<Op *> ops) {
+        return new BasicBlock(name, ops);
     }
-};
 
-class BasicBlock_impl {
-    std::list<BasicBlock> _preds;
-    std::list<Op*> _ops;
-    std::list<BasicBlock> _succs;
-
-  public:
-    BasicBlock_impl() {}
-
-    auto addOp(Op* op) {
-        _ops.push_back(op);
+    auto &addOp(Op *op) {
+        _ops.push_back(std::unique_ptr<Op>(op));
         return _ops.back();
     }
-};
 
-class BasicBlock {
-    std::unique_ptr<BasicBlock_impl> impl;
+    friend std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
+        auto &stream = os << bb._name << ":\n";
+        for (auto &op : bb._ops) {
+            stream << '\t' << *op << '\n';
+        }
 
-  public:
-    BasicBlock() : impl(new BasicBlock_impl) {}
-
-    bool operator==(const BasicBlock &other) const { return impl == other.impl; }
-
-    auto addOp(Op* op) { return impl->addOp(op); }
+        return stream;
+    }
 };
 
 // class Function {
