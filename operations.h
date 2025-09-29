@@ -6,8 +6,7 @@
 namespace IR {
 
 class ParamOp : public Op {
-    virtual std::ostream &stringify(std::ostream &os,
-                                    const Op &op [[maybe_unused]]) const override {
+    virtual std::ostream &stringify(std::ostream &os) const override {
         return os << "ParamOp" << '[' << _type << ']';
     }
 
@@ -19,7 +18,7 @@ class BinaryOp : public Op {
     Op *_lhs;
     Op *_rhs;
 
-    std::ostream &printArgs(std::ostream &os, const Op &op [[maybe_unused]]) const {
+    std::ostream &printArgs(std::ostream &os) const {
         os << "($";
         if (_lhs) {
             os << _lhs->getName() << "[" << _lhs->getType() << "]";
@@ -57,8 +56,8 @@ class AddOp : public BinaryOp {
                (_lhs->getType() == _rhs->getType()) && (_rhs->getType() == _type);
     }
 
-    virtual std::ostream &stringify(std::ostream &os, const Op &op) const override {
-        return printArgs(os << "AddOp ", op);
+    virtual std::ostream &stringify(std::ostream &os) const override {
+        return printArgs(os << "AddOp ");
     }
 };
 
@@ -76,8 +75,7 @@ class PhiNode : public Op {
         return std::all_of(_sources.begin(), _sources.end(), verifyOp);
     }
 
-    virtual std::ostream &stringify(std::ostream &os,
-                                    const Op &op [[maybe_unused]]) const override {
+    virtual std::ostream &stringify(std::ostream &os) const override {
         auto &stream = os << "PhiNode (";
 
         auto printSrc = [&stream](const Op *op) -> auto & {
@@ -104,8 +102,7 @@ class JumpOp : public Op {
 
     virtual bool verify() const override { return _dest != nullptr; }
 
-    virtual std::ostream &stringify(std::ostream &os,
-                                    const Op &op [[maybe_unused]]) const override {
+    virtual std::ostream &stringify(std::ostream &os) const override {
         return os << "Jmp to " << _dest->getName();
     }
 };

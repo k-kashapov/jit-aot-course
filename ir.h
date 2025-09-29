@@ -23,6 +23,8 @@ class Op {
     Op() : _type(Type::EType::SI32) {};
     Op(const std::string &name) : _name(name), _type(Type::EType::SI32) {}
 
+    virtual std::ostream &stringify(std::ostream &os) const = 0;
+
   public:
     template <typename Ty, class... Args>
     // requires(std::is_base_of<Op, Ty>::value)
@@ -33,11 +35,10 @@ class Op {
         return res;
     }
 
-    virtual std::ostream &stringify(std::ostream &os, const Op &op) const = 0;
     virtual bool verify() const = 0;
 
     friend std::ostream &operator<<(std::ostream &os, const Op &op) {
-        return op.stringify(os << '$' << op._name << '[' << op._type << "] = ", op);
+        return op.stringify(os << '$' << op._name << '[' << op._type << "] = ");
     }
 
     void setBB(BasicBlock *bb) { _bb = bb; }

@@ -9,7 +9,7 @@
 namespace IR {
 
 struct Type {
-    enum class EType {
+    enum class EType : uint64_t {
         None,
         SI64,
         SI32,
@@ -26,7 +26,7 @@ struct Type {
 
     EType _ety = EType::None;
 
-    int64_t getWidth() {
+    uint64_t getWidth() {
         switch (_ety) {
         case EType::None:
             return 0;
