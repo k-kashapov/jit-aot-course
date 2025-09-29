@@ -7,10 +7,6 @@ int main() {
     auto in2 = IR::Op::create<IR::ParamOp>("in2", IR::Type::EType::F16);
     auto add = IR::Op::create<IR::AddOp>("add", IR::Type::EType::F16, in1, in2);
 
-    std::cout << *in1 << "\n";
-    std::cout << *in2 << "\n";
-    std::cout << *add << "\n";
-
     auto bb = IR::BasicBlock::create("testBB", {in1, in2, add});
 
     in1 = IR::Op::create<IR::ParamOp>("in1", IR::Type::EType::F16);
