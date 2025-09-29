@@ -6,21 +6,20 @@
 namespace IR {
 
 class ParamOp : public Op {
-    virtual std::ostream &stringify(std::ostream &os, const Op &op [[maybe_unused]]) const override {
+    virtual std::ostream &stringify(std::ostream &os,
+                                    const Op &op [[maybe_unused]]) const override {
         return os << "ParamOp" << '[' << _type << ']';
     }
 
-    virtual bool verify() const override {
-        return true;
-    }
+    virtual bool verify() const override { return true; }
 };
 
 class BinaryOp : public Op {
-protected:
+  protected:
     Op *_lhs;
     Op *_rhs;
 
-    std::ostream &printArgs(std::ostream &os, const Op& op [[maybe_unused]]) const {
+    std::ostream &printArgs(std::ostream &os, const Op &op [[maybe_unused]]) const {
         os << "($";
         if (_lhs) {
             os << _lhs->getName() << "[" << _lhs->getType() << "]";
@@ -39,7 +38,7 @@ protected:
         return os << ')';
     }
 
-public:
+  public:
     BinaryOp(Op *lhs, Op *rhs) : _lhs(lhs), _rhs(rhs) {}
 
     const std::vector<Op *> getInputs() const { return std::vector<Op *>{_lhs, _rhs}; }
@@ -54,11 +53,60 @@ class AddOp : public BinaryOp {
     AddOp(Op *lhs, Op *rhs) : BinaryOp(lhs, rhs) {}
 
     virtual bool verify() const override {
-        return _lhs && _rhs && _lhs->verify() && _rhs->verify() && (_lhs->getType() == _rhs->getType()) && (_rhs->getType() == _type);
+        return _lhs && _rhs && _lhs->verify() && _rhs->verify() &&
+               (_lhs->getType() == _rhs->getType()) && (_rhs->getType() == _type);
     }
 
     virtual std::ostream &stringify(std::ostream &os, const Op &op) const override {
         return printArgs(os << "AddOp ", op);
+    }
+};
+
+class PhiNode : public Op {
+    std::list<Op *> _sources;
+
+  public:
+    PhiNode(std::initializer_list<Op *> ops) : _sources(ops) {}
+
+    virtual bool verify() const override {
+        auto verifyOp = [*this](const Op *op) {
+            return op && op->verify() && (op->getType() == this->_type);
+        };
+
+        return std::all_of(_sources.begin(), _sources.end(), verifyOp);
+    }
+
+    virtual std::ostream &stringify(std::ostream &os,
+                                    const Op &op [[maybe_unused]]) const override {
+        auto &stream = os << "PhiNode (";
+
+        auto printSrc = [&stream](const Op *op) -> auto & {
+            return stream << op->getBB()->getName() << "." << op->getName();
+        };
+
+        for (auto src = _sources.begin(); src != std::prev(_sources.end()); src++) {
+            printSrc(*src) << ", ";
+        }
+
+        return printSrc(_sources.back()) << ")";
+    }
+};
+
+class JumpOp : public Op {
+    BasicBlock *_dest = nullptr;
+
+  public:
+    JumpOp(BasicBlock *dest) : _dest(dest) {}
+
+    BasicBlock *getDest() const { return _dest; }
+
+    void setDest(BasicBlock *bb) { _dest = bb; }
+
+    virtual bool verify() const override { return _dest != nullptr; }
+
+    virtual std::ostream &stringify(std::ostream &os,
+                                    const Op &op [[maybe_unused]]) const override {
+        return os << "Jmp to " << _dest->getName();
     }
 };
 

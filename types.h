@@ -2,14 +2,15 @@
 #define TYPES_H
 
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
-#include <iostream>
 
 namespace IR {
 
 struct Type {
     enum class EType {
+        None,
         SI64,
         SI32,
         SI16,
@@ -23,10 +24,12 @@ struct Type {
         F16,
     };
 
-    EType _ety;
+    EType _ety = EType::None;
 
     int64_t getWidth() {
         switch (_ety) {
+        case EType::None:
+            return 0;
         case EType::SI64:
             return 64;
         case EType::SI32:
@@ -56,6 +59,8 @@ struct Type {
 
     bool isUnsigned() {
         switch (_ety) {
+        case EType::None:
+            return false;
         case EType::SI64:
             return false;
         case EType::SI32:
@@ -83,12 +88,12 @@ struct Type {
         }
     }
 
-    bool operator==(const Type& other) const {
-        return _ety == other._ety;
-    }
+    bool operator==(const Type &other) const { return _ety == other._ety; }
 
-    friend std::ostream &operator<<(std::ostream& os, const Type& ty) {
+    friend std::ostream &operator<<(std::ostream &os, const Type &ty) {
         switch (ty._ety) {
+        case EType::None:
+            return os << "";
         case EType::SI64:
             return os << "SI64";
         case EType::SI32:
@@ -96,7 +101,7 @@ struct Type {
         case EType::SI16:
             return os << "SI16";
         case EType::SI8:
-            return os <<"SI8";
+            return os << "SI8";
         case EType::UI64:
             return os << "UI64";
         case EType::UI32:
@@ -104,7 +109,7 @@ struct Type {
         case EType::UI16:
             return os << "UI16";
         case EType::UI8:
-            return os <<"UI8";
+            return os << "UI8";
         case EType::F64:
             return os << "F64";
         case EType::F32:
@@ -112,7 +117,8 @@ struct Type {
         case EType::F16:
             return os << "F16";
         default:
-            throw std::runtime_error("unexpected type: " + std::to_string(static_cast<int>(ty._ety)));
+            throw std::runtime_error("unexpected type: " +
+                                     std::to_string(static_cast<int>(ty._ety)));
         }
     }
 

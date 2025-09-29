@@ -40,6 +40,10 @@ class Op {
         return op.stringify(os << '$' << op._name << '[' << op._type << "] = ", op);
     }
 
+    void setBB(BasicBlock *bb) { _bb = bb; }
+
+    BasicBlock *getBB() const { return _bb; }
+
     Type getType() const { return _type; }
     const std::string &getName() const { return _name; }
 
@@ -55,6 +59,7 @@ class BasicBlock {
     BasicBlock(std::string_view name) : _name(name) {}
     BasicBlock(std::string_view name, std::initializer_list<Op *> ops) : _name(name) {
         for (auto *op : ops) {
+            op->setBB(this);
             _ops.push_back(std::unique_ptr<Op>(op));
         }
     }
@@ -70,6 +75,22 @@ class BasicBlock {
         _ops.push_back(std::unique_ptr<Op>(op));
         return _ops.back();
     }
+
+    BasicBlock *addPred(BasicBlock *bb) {
+        _preds.push_back(bb);
+        return _preds.back();
+    }
+
+    BasicBlock *addSucc(BasicBlock *bb) {
+        _succs.push_back(bb);
+        return _succs.back();
+    }
+
+    const std::string_view getName() const { return _name; }
+
+    const std::list<BasicBlock *> &getSuccessors() const { return _succs; }
+
+    const std::list<BasicBlock *> &getPreds() const { return _preds; }
 
     friend std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
         auto &stream = os << bb._name << ":\n";
