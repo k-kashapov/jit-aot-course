@@ -51,14 +51,14 @@ class BinaryOp : public Op {
 #define ADD_BINARY_OP(OP_NAME)                                                                     \
     class OP_NAME : public BinaryOp {                                                              \
         virtual std::ostream &stringify(std::ostream &os) const override {                         \
-            return printArgs(os << "OP_NAME ");                                                    \
+            return printArgs(os << #OP_NAME" ");                                                    \
         }                                                                                          \
                                                                                                    \
       public:                                                                                      \
         OP_NAME(Op *lhs, Op *rhs) : BinaryOp(lhs, rhs) {}                                          \
         virtual bool verify() const override {                                                     \
             return _lhs && _rhs && _lhs->verify() && _rhs->verify() &&                             \
-                   (_lhs->getType() == _rhs->getType()) && (_rhs->getType() == _type);             \
+                   (_lhs->getType() == _rhs->getType());                                           \
         }                                                                                          \
     };
 
@@ -130,7 +130,7 @@ class CondBrOp : public Op {
     BasicBlock *_dest = nullptr;
 
     virtual std::ostream &stringify(std::ostream &os) const override {
-        return os << "Jmp to " << _dest->getName() << " if " << _cond->getName();
+        return os << "Jmp to " << _dest->getName() << " if " << '$' << _cond->getName();
     }
 
   public:
@@ -151,6 +151,79 @@ class CondBrOp : public Op {
     virtual bool verify() const override {
         return _dest != nullptr && _cond != nullptr && _cond->getType() == Type::EType::BOOL &&
                _cond->verify();
+    }
+};
+
+class ConstOp : public Op {
+    int64_t _value = 0;
+
+    virtual std::ostream &stringify(std::ostream &os) const override {
+        return os << "Const " << '(' << _value << ')';
+    }
+
+public:
+    ConstOp(int64_t val) : _value(val) {}
+
+    int64_t getValue() const { return _value; }
+    void setValue(int64_t val) { _value = val; }
+
+    virtual bool verify() const override {
+        return true;
+    }
+};
+
+class CallOp : public Op {
+    BasicBlock *_dest = nullptr;
+    std::list<Op *> _params;
+
+    virtual std::ostream &stringify(std::ostream &os) const override {
+        os << "Call " << _dest->getName();
+        if (_params.empty()) return os;
+
+        os << " (";
+
+        for (auto p : _params) {
+            os << '$' << p->getName() << ", ";
+        }
+
+        return os << "\b\b)";
+    }
+
+  public:
+    CallOp(BasicBlock *dest) : _dest(dest) {}
+    CallOp(BasicBlock *dest, std::initializer_list<Op *> params) : _dest(dest), _params(params) {}
+
+    BasicBlock *getDest() const { return _dest; }
+
+    void setDest(BasicBlock *bb) { _dest = bb; }
+
+    virtual void setBB(BasicBlock *bb) override {
+        _bb = bb;
+        _dest->addPred(_bb);
+        _bb->addSucc(_dest);
+    }
+
+    virtual bool verify() const override {
+        auto verifyOp = [](Op *p){ return p->verify(); };
+        return _dest != nullptr && std::all_of(_params.begin(), _params.end(), verifyOp);
+    }
+};
+
+class RetOp : public Op {
+    Op *_val = nullptr;
+
+    virtual std::ostream &stringify(std::ostream &os) const override {
+        return os << "Ret " << '$' << _val->getName() << '[' << _val->getType() << ']';
+    }
+
+public:
+    RetOp(Op *val) : _val(val) {}
+
+    Op* getValue() const { return _val; }
+    void setValue(Op* val) { _val = val; }
+
+    virtual bool verify() const override {
+        return _val->verify();
     }
 };
 

@@ -33,7 +33,7 @@ class Op {
         res->_name = name;
         res->_type = ty;
         if (!res->verify()) {
-            std::cerr << "Invalid operation: " << res << "\n";
+            std::cerr << "Invalid operation: " << *res << "\n";
             delete res;
             return nullptr;
         }
@@ -84,14 +84,22 @@ class BasicBlock {
         return _ops.back();
     }
 
-    BasicBlock *addPred(BasicBlock *bb) {
+    void addPred(BasicBlock *bb) {
         _preds.push_back(bb);
-        return _preds.back();
     }
 
-    BasicBlock *addSucc(BasicBlock *bb) {
+    void linkPred(BasicBlock *bb) {
+        addPred(bb);
+        bb->addSucc(this);
+    }
+
+    void addSucc(BasicBlock *bb) {
         _succs.push_back(bb);
-        return _succs.back();
+    }
+
+    void linkSucc(BasicBlock *bb) {
+        addSucc(bb);
+        bb->addPred(this);
     }
 
     const std::string_view getName() const { return _name; }
@@ -120,6 +128,17 @@ class BasicBlock {
         }
 
         return stream;
+    }
+
+    void insertOp(Op *pos, Op *op) {
+        auto iter = _ops.begin();
+        for (; iter != _ops.end(); iter++) {
+            if (iter->get()->getName() == pos->getName()) {
+                break;
+            }
+        }
+
+        _ops.insert(iter, std::unique_ptr<Op>(op));
     }
 };
 
