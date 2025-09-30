@@ -44,7 +44,7 @@ class Op {
     virtual bool verify() const = 0;
 
     friend std::ostream &operator<<(std::ostream &os, const Op &op) {
-        return op.stringify(os << '$' << op._name << '[' << op._type << "] = ");
+        return op.stringify(os << '$' << op._name << '<' << op._type << "> = ");
     }
 
     virtual void setBB(BasicBlock *bb) { _bb = bb; }

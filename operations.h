@@ -7,7 +7,7 @@ namespace IR {
 
 class ParamOp : public Op {
     virtual std::ostream &stringify(std::ostream &os) const override {
-        return os << "ParamOp" << '[' << _type << ']';
+        return os << "ParamOp <" << _type << '>';
     }
 
   public:
@@ -22,7 +22,7 @@ class BinaryOp : public Op {
     std::ostream &printArgs(std::ostream &os) const {
         os << "($";
         if (_lhs) {
-            os << _lhs->getName() << "[" << _lhs->getType() << "]";
+            os << _lhs->getName() << '<' << _lhs->getType() << '>';
         } else {
             os << "nullptr";
         }
@@ -30,7 +30,7 @@ class BinaryOp : public Op {
         os << ", $";
 
         if (_rhs) {
-            os << _rhs->getName() << "[" << _rhs->getType() << "]";
+            os << _rhs->getName() << '<' << _rhs->getType() << '>';
         } else {
             os << "nullptr";
         }
@@ -213,7 +213,7 @@ class RetOp : public Op {
     Op *_val = nullptr;
 
     virtual std::ostream &stringify(std::ostream &os) const override {
-        return os << "Ret " << '$' << _val->getName() << '[' << _val->getType() << ']';
+        return os << "Ret " << '$' << _val->getName() << '<' << _val->getType() << '>';
     }
 
 public:
