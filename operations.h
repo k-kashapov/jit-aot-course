@@ -10,6 +10,7 @@ class ParamOp : public Op {
         return os << "ParamOp" << '[' << _type << ']';
     }
 
+  public:
     virtual bool verify() const override { return true; }
 };
 
@@ -47,19 +48,31 @@ class BinaryOp : public Op {
     Op *getRhs() const { return _rhs; }
 };
 
-class AddOp : public BinaryOp {
-  public:
-    AddOp(Op *lhs, Op *rhs) : BinaryOp(lhs, rhs) {}
+#define ADD_BINARY_OP(OP_NAME)                                                                     \
+    class OP_NAME : public BinaryOp {                                                              \
+        virtual std::ostream &stringify(std::ostream &os) const override {                         \
+            return printArgs(os << "OP_NAME ");                                                    \
+        }                                                                                          \
+                                                                                                   \
+      public:                                                                                      \
+        OP_NAME(Op *lhs, Op *rhs) : BinaryOp(lhs, rhs) {}                                          \
+        virtual bool verify() const override {                                                     \
+            return _lhs && _rhs && _lhs->verify() && _rhs->verify() &&                             \
+                   (_lhs->getType() == _rhs->getType()) && (_rhs->getType() == _type);             \
+        }                                                                                          \
+    };
 
-    virtual bool verify() const override {
-        return _lhs && _rhs && _lhs->verify() && _rhs->verify() &&
-               (_lhs->getType() == _rhs->getType()) && (_rhs->getType() == _type);
-    }
+ADD_BINARY_OP(AddOp);
+ADD_BINARY_OP(SubOp);
+ADD_BINARY_OP(MulOp);
+ADD_BINARY_OP(DivOp);
+ADD_BINARY_OP(EqOp);
+ADD_BINARY_OP(GreaterOp);
+ADD_BINARY_OP(AndOp);
+ADD_BINARY_OP(OrOp);
+ADD_BINARY_OP(XorOp);
 
-    virtual std::ostream &stringify(std::ostream &os) const override {
-        return printArgs(os << "AddOp ");
-    }
-};
+#undef ADD_BINARY_OP
 
 class PhiNode : public Op {
     std::list<Op *> _sources;
@@ -92,6 +105,9 @@ class PhiNode : public Op {
 
 class JumpOp : public Op {
     BasicBlock *_dest = nullptr;
+    virtual std::ostream &stringify(std::ostream &os) const override {
+        return os << "Jmp to " << _dest->getName();
+    }
 
   public:
     JumpOp(BasicBlock *dest) : _dest(dest) {}
@@ -100,10 +116,41 @@ class JumpOp : public Op {
 
     void setDest(BasicBlock *bb) { _dest = bb; }
 
+    virtual void setBB(BasicBlock *bb) override {
+        _bb = bb;
+        _dest->addPred(_bb);
+        _bb->addSucc(_dest);
+    }
+
     virtual bool verify() const override { return _dest != nullptr; }
+};
+
+class CondBrOp : public Op {
+    Op *_cond = nullptr;
+    BasicBlock *_dest = nullptr;
 
     virtual std::ostream &stringify(std::ostream &os) const override {
-        return os << "Jmp to " << _dest->getName();
+        return os << "Jmp to " << _dest->getName() << " if " << _cond->getName();
+    }
+
+  public:
+    CondBrOp(Op *cond, BasicBlock *dest) : _cond(cond), _dest(dest) {}
+
+    BasicBlock *getDest() const { return _dest; }
+    void setDest(BasicBlock *bb) { _dest = bb; }
+
+    Op *getCond() const { return _cond; }
+    void setCond(Op *cond) { _cond = cond; }
+
+    virtual void setBB(BasicBlock *bb) override {
+        _bb = bb;
+        _dest->addPred(_bb);
+        _bb->addSucc(_dest);
+    }
+
+    virtual bool verify() const override {
+        return _dest != nullptr && _cond != nullptr && _cond->getType() == Type::EType::BOOL &&
+               _cond->verify();
     }
 };
 

@@ -22,6 +22,7 @@ struct Type {
         F64,
         F32,
         F16,
+        BOOL,
     };
 
     EType _ety = EType::None;
@@ -52,6 +53,8 @@ struct Type {
             return 32;
         case EType::F16:
             return 16;
+        case EType::BOOL:
+            return 1;
         default:
             throw std::runtime_error("unexpected type: " + std::to_string(static_cast<int>(_ety)));
         }
@@ -83,6 +86,8 @@ struct Type {
             return false;
         case EType::F16:
             return false;
+        case EType::BOOL:
+            return true;
         default:
             throw std::runtime_error("unexpected type: " + std::to_string(static_cast<int>(_ety)));
         }
@@ -116,6 +121,8 @@ struct Type {
             return os << "F32";
         case EType::F16:
             return os << "F16";
+        case EType::BOOL:
+            return os << "BOOL";
         default:
             throw std::runtime_error("unexpected type: " +
                                      std::to_string(static_cast<int>(ty._ety)));

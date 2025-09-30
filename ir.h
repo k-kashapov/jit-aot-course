@@ -28,10 +28,16 @@ class Op {
   public:
     template <typename Ty, class... Args>
     // requires(std::is_base_of<Op, Ty>::value)
-    static auto create(const std::string &name, Type ty, Args... args) {
+    static Ty *create(const std::string &name, Type ty, Args... args) {
         auto res = new Ty(args...);
         res->_name = name;
         res->_type = ty;
+        if (!res->verify()) {
+            std::cerr << "Invalid operation: " << res << "\n";
+            delete res;
+            return nullptr;
+        }
+
         return res;
     }
 
@@ -41,7 +47,7 @@ class Op {
         return op.stringify(os << '$' << op._name << '[' << op._type << "] = ");
     }
 
-    void setBB(BasicBlock *bb) { _bb = bb; }
+    virtual void setBB(BasicBlock *bb) { _bb = bb; }
 
     BasicBlock *getBB() const { return _bb; }
 
@@ -73,6 +79,7 @@ class BasicBlock {
     }
 
     auto &addOp(Op *op) {
+        op->setBB(this);
         _ops.push_back(std::unique_ptr<Op>(op));
         return _ops.back();
     }
@@ -94,7 +101,20 @@ class BasicBlock {
     const std::list<BasicBlock *> &getPreds() const { return _preds; }
 
     friend std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
-        auto &stream = os << bb._name << ":\n";
+        auto &stream = os << bb._name << " (Preds: ";
+
+        for (auto pred : bb._preds) {
+            stream << pred->getName() << ", ";
+        }
+
+        stream << "\b\b) (Succs: ";
+
+        for (auto succ : bb._succs) {
+            stream << succ->getName() << ", ";
+        }
+
+        stream << "\b\b):\n";
+
         for (auto &op : bb._ops) {
             stream << '\t' << *op << '\n';
         }
