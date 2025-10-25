@@ -8,28 +8,30 @@
 
 namespace IR {
 
-struct Type {
-    enum class EType : uint64_t {
-        None,
-        SI64,
-        SI32,
-        SI16,
-        SI8,
-        UI64,
-        UI32,
-        UI16,
-        UI8,
-        F64,
-        F32,
-        F16,
-        BOOL,
-    };
+enum class EType : uint64_t {
+    None,
+    Void,
+    SI64,
+    SI32,
+    SI16,
+    SI8,
+    UI64,
+    UI32,
+    UI16,
+    UI8,
+    F64,
+    F32,
+    F16,
+    BOOL,
+};
 
+struct Type {
     EType _ety = EType::None;
 
     uint64_t getWidth() {
         switch (_ety) {
         case EType::None:
+        case EType::Void:
             return 0;
         case EType::SI64:
             return 64;
@@ -63,6 +65,7 @@ struct Type {
     bool isUnsigned() {
         switch (_ety) {
         case EType::None:
+        case EType::Void:
             return false;
         case EType::SI64:
             return false;
@@ -98,31 +101,33 @@ struct Type {
     friend std::ostream &operator<<(std::ostream &os, const Type &ty) {
         switch (ty._ety) {
         case EType::None:
-            return os << "";
+            return os << "<>";
+        case EType::Void:
+            return os << "<Void>";
         case EType::SI64:
-            return os << "SI64";
+            return os << "<SI64>";
         case EType::SI32:
-            return os << "SI32";
+            return os << "<SI32>";
         case EType::SI16:
-            return os << "SI16";
+            return os << "<SI16>";
         case EType::SI8:
-            return os << "SI8";
+            return os << "<SI8>";
         case EType::UI64:
-            return os << "UI64";
+            return os << "<UI64>";
         case EType::UI32:
-            return os << "UI32";
+            return os << "<UI32>";
         case EType::UI16:
-            return os << "UI16";
+            return os << "<UI16>";
         case EType::UI8:
-            return os << "UI8";
+            return os << "<UI8>";
         case EType::F64:
-            return os << "F64";
+            return os << "<F64>";
         case EType::F32:
-            return os << "F32";
+            return os << "<F32>";
         case EType::F16:
-            return os << "F16";
+            return os << "<F16>";
         case EType::BOOL:
-            return os << "BOOL";
+            return os << "<BOOL>";
         default:
             throw std::runtime_error("unexpected type: " +
                                      std::to_string(static_cast<int>(ty._ety)));

@@ -2,12 +2,13 @@
 #define OPERATIONS_H
 
 #include "ir.h"
+#include <algorithm>
 
 namespace IR {
 
 class ParamOp : public Op {
     virtual std::ostream &stringify(std::ostream &os) const override {
-        return os << "ParamOp <" << _type << '>';
+        return os << "ParamOp " << _type;
     }
 
   public:
@@ -20,17 +21,17 @@ class BinaryOp : public Op {
     Op *_rhs;
 
     std::ostream &printArgs(std::ostream &os) const {
-        os << "($";
+        os << '(';
         if (_lhs) {
-            os << _lhs->getName() << '<' << _lhs->getType() << '>';
+            _lhs->printNameAndType(os);
         } else {
             os << "nullptr";
         }
 
-        os << ", $";
+        os << ", ";
 
         if (_rhs) {
-            os << _rhs->getName() << '<' << _rhs->getType() << '>';
+            _rhs->printNameAndType(os);
         } else {
             os << "nullptr";
         }
@@ -41,7 +42,7 @@ class BinaryOp : public Op {
   public:
     BinaryOp(Op *lhs, Op *rhs) : _lhs(lhs), _rhs(rhs) {}
 
-    const std::vector<Op *> getInputs() const { return std::vector<Op *>{_lhs, _rhs}; }
+    auto getInputs() const { return std::pair{_lhs, _rhs}; }
 
     Op *getLhs() const { return _lhs; }
 
@@ -51,13 +52,13 @@ class BinaryOp : public Op {
 #define ADD_BINARY_OP(OP_NAME)                                                                     \
     class OP_NAME : public BinaryOp {                                                              \
         virtual std::ostream &stringify(std::ostream &os) const override {                         \
-            return printArgs(os << #OP_NAME" ");                                                    \
+            return printArgs(os << #OP_NAME " ");                                                  \
         }                                                                                          \
                                                                                                    \
       public:                                                                                      \
         OP_NAME(Op *lhs, Op *rhs) : BinaryOp(lhs, rhs) {}                                          \
         virtual bool verify() const override {                                                     \
-            return _lhs && _rhs && _lhs->verify() && _rhs->verify() &&                             \
+            return _lhs && _rhs &&                             \
                    (_lhs->getType() == _rhs->getType());                                           \
         }                                                                                          \
     };
@@ -74,15 +75,15 @@ ADD_BINARY_OP(XorOp);
 
 #undef ADD_BINARY_OP
 
-class PhiNode : public Op {
-    std::list<Op *> _sources;
+class PhiNode : public Op {   // TODO: check recursion on verify
+    std::list<Op *> _sources; // TODO: add operation and bb links
 
   public:
     PhiNode(std::initializer_list<Op *> ops) : _sources(ops) {}
 
     virtual bool verify() const override {
         auto verifyOp = [*this](const Op *op) {
-            return op && op->verify() && (op->getType() == this->_type);
+            return op && (op->getType() == this->_type);
         };
 
         return std::all_of(_sources.begin(), _sources.end(), verifyOp);
@@ -92,7 +93,7 @@ class PhiNode : public Op {
         auto &stream = os << "PhiNode (";
 
         auto printSrc = [&stream](const Op *op) -> auto & {
-            return stream << op->getBB()->getName() << "." << op->getName();
+            return stream << op->getBB()->getName() << "." << op->getId();
         };
 
         for (auto src = _sources.begin(); src != std::prev(_sources.end()); src++) {
@@ -118,19 +119,19 @@ class JumpOp : public Op {
 
     virtual void setBB(BasicBlock *bb) override {
         _bb = bb;
-        _dest->addPred(_bb);
-        _bb->addSucc(_dest);
+        _bb->linkSucc(_dest);
     }
 
     virtual bool verify() const override { return _dest != nullptr; }
 };
 
-class CondBrOp : public Op {
-    Op *_cond = nullptr;
+class CondBrOp : public Op { // TODO: check successors number and branch to successors
+    Op *_cond = nullptr; // TODO: check that if successors number is consistent with last op in bb
     BasicBlock *_dest = nullptr;
 
     virtual std::ostream &stringify(std::ostream &os) const override {
-        return os << "Jmp to " << _dest->getName() << " if " << '$' << _cond->getName();
+        os << "Jmp to " << _dest->getName() << " if ";
+        return _cond->printNameAndType(os);
     }
 
   public:
@@ -144,13 +145,11 @@ class CondBrOp : public Op {
 
     virtual void setBB(BasicBlock *bb) override {
         _bb = bb;
-        _dest->addPred(_bb);
-        _bb->addSucc(_dest);
+        _bb->linkSucc(_dest);
     }
 
     virtual bool verify() const override {
-        return _dest != nullptr && _cond != nullptr && _cond->getType() == Type::EType::BOOL &&
-               _cond->verify();
+        return _dest != nullptr && _cond != nullptr && _cond->getType() == EType::BOOL;
     }
 };
 
@@ -161,15 +160,13 @@ class ConstOp : public Op {
         return os << "Const " << '(' << _value << ')';
     }
 
-public:
+  public:
     ConstOp(int64_t val) : _value(val) {}
 
     int64_t getValue() const { return _value; }
     void setValue(int64_t val) { _value = val; }
 
-    virtual bool verify() const override {
-        return true;
-    }
+    virtual bool verify() const override { return true; }
 };
 
 class CallOp : public Op {
@@ -178,12 +175,14 @@ class CallOp : public Op {
 
     virtual std::ostream &stringify(std::ostream &os) const override {
         os << "Call " << _dest->getName();
-        if (_params.empty()) return os;
+        if (_params.empty())
+            return os;
 
         os << " (";
 
         for (auto p : _params) {
-            os << '$' << p->getName() << ", ";
+            p->printNameAndType(os);
+            os << ", ";
         }
 
         return os << "\b\b)";
@@ -199,13 +198,11 @@ class CallOp : public Op {
 
     virtual void setBB(BasicBlock *bb) override {
         _bb = bb;
-        _dest->addPred(_bb);
-        _bb->addSucc(_dest);
+        _bb->linkSucc(_dest);
     }
 
     virtual bool verify() const override {
-        auto verifyOp = [](Op *p){ return p->verify(); };
-        return _dest != nullptr && std::all_of(_params.begin(), _params.end(), verifyOp);
+        return _dest != nullptr;
     }
 };
 
@@ -213,18 +210,17 @@ class RetOp : public Op {
     Op *_val = nullptr;
 
     virtual std::ostream &stringify(std::ostream &os) const override {
-        return os << "Ret " << '$' << _val->getName() << '<' << _val->getType() << '>';
+        os << "Ret ";
+        return _val->printNameAndType(os);
     }
 
-public:
+  public:
     RetOp(Op *val) : _val(val) {}
 
-    Op* getValue() const { return _val; }
-    void setValue(Op* val) { _val = val; }
+    Op *getValue() const { return _val; }
+    void setValue(Op *val) { _val = val; }
 
-    virtual bool verify() const override {
-        return _val->verify();
-    }
+    virtual bool verify() const override { return _val->verify(); }
 };
 
 } // namespace IR
