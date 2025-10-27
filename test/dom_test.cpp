@@ -41,7 +41,7 @@ void test1() {
         std::cout << '\n';
     }
 
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
+    auto immdoms = IR::find_immediate_dominators(a.bb(), dominators);
     for (const auto &[key, value] : immdoms) {
         // std::cout << key << ", " << value << "\n";
         std::cout << key->getName() << " immediate dominator: ";
@@ -98,7 +98,7 @@ void test2() {
     std::cout << i << '\n';
     std::cout << j << '\n';
     std::cout << k << '\n';
-    auto dominators = find_dominators(a.bb(), allNodes);
+    auto dominators = IR::find_dominators(a.bb(), allNodes);
 
     std::cout << "Found dominators:\n";
     for (const auto &[key, value] : dominators) {
@@ -109,7 +109,7 @@ void test2() {
         std::cout << '\n';
     }
 
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
+    auto immdoms = IR::find_immediate_dominators(a.bb(), dominators);
     for (const auto &[key, value] : immdoms) {
         // std::cout << key << ", " << value << "\n";
         std::cout << key->getName() << " immediate dominator: ";
@@ -180,7 +180,7 @@ void test3() {
         std::cout << '\n';
     }
 
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
+    auto immdoms = IR::find_immediate_dominators(a.bb(), dominators);
     for (const auto &[key, value] : immdoms) {
         // std::cout << key << ", " << value << "\n";
         std::cout << key->getName() << " immediate dominator: ";

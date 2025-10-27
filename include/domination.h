@@ -4,11 +4,18 @@
 #include <map>
 #include <ir.h>
 
-std::unordered_map<IR::BasicBlock *, std::set<IR::BasicBlock *>>
-find_dominators(IR::BasicBlock *start, std::set<IR::BasicBlock*> allNodes);
+namespace IR {
 
-std::map<IR::BasicBlock*, IR::BasicBlock*>
-find_immediate_dominators(IR::BasicBlock* start, std::unordered_map<IR::BasicBlock*, std::set<IR::BasicBlock *>> dmap);
+using BB = IR::BasicBlock;
+using bbSet = std::set<BB *>;
+using dominatorMap = std::unordered_map<BB *, bbSet>;
 
-std::vector<IR::BasicBlock*> bfs(IR::BasicBlock* bb, std::function<void (IR::BasicBlock*)> fn);
-std::vector<IR::BasicBlock*> dfs(IR::BasicBlock* start, std::function<void (IR::BasicBlock*)> fn);
+dominatorMap find_dominators(BB *start, std::set<BB*> allNodes);
+
+std::map<BB*, BB*>
+find_immediate_dominators(BB* start, dominatorMap dmap);
+
+std::vector<BB*> bfs(BB* bb, std::function<void (BB*)> fn);
+std::vector<BB*> dfs(BB* start, std::function<void (BB*)> fn);
+
+};

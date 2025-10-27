@@ -1,10 +1,7 @@
 #include <algorithm>
 #include <domination.h>
 
-using BB = IR::BasicBlock;
-using bbSet = std::set<BB *>;
-using dominatorMap = std::unordered_map<BB *, bbSet>;
-
+namespace IR {
 std::vector<BB*>& _bfs(BB* bb, std::vector<BB*>& order, std::function<void (BB*)> fn) {
     const auto [l, r] = bb->getSuccessors();
     bool visitL = false;
@@ -37,7 +34,7 @@ std::vector<BB*> bfs(BB* start, std::function<void (BB*)> fn) {
     return _bfs(start, order, fn);
 }
 
-std::vector<BB*>& _dfs(BB* bb, std::vector<BB*>& order, std::function<void (BB*)> fn) {
+void _dfs(BB* bb, std::vector<BB*>& order, std::function<void (BB*)> fn) {
     if (fn) { fn(bb); }
     order.push_back(bb);
 
@@ -48,13 +45,12 @@ std::vector<BB*>& _dfs(BB* bb, std::vector<BB*>& order, std::function<void (BB*)
     if (r && std::find(order.begin(), order.end(), r) == order.end()) {
         _dfs(r, order, fn);
     }
-
-    return order;
 }
 
 std::vector<BB*> dfs(BB* start, std::function<void (BB*)> fn) {
     std::vector<BB*> order;
-    return _dfs(start, order, fn);
+    _dfs(start, order, fn);
+    return order;
 }
 
 dominatorMap find_dominators(BB *start, bbSet allNodes) {
@@ -133,3 +129,5 @@ std::map<BB*, BB*> find_immediate_dominators(BB* start, dominatorMap dmap) {
 
     return res;
 }
+
+};
