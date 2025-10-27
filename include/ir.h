@@ -1,14 +1,13 @@
 #ifndef IR_H
 #define IR_H
 
-#include <algorithm>
 #include <iostream>
 #include <list>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "types.h"
+#include <types.h>
 
 namespace IR {
 

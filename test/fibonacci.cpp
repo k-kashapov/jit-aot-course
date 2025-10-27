@@ -1,6 +1,6 @@
-#include "ir.h"
-#include "operations.h"
-#include "types.h"
+#include <ir.h>
+#include <operations.h>
+#include <types.h>
 
 int main() {
     auto n = IR::Op::create<IR::ParamOp>(IR::EType::UI32);

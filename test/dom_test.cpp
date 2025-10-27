@@ -1,13 +1,10 @@
-#include "ir.h"
-#include <set>
-#include <unordered_map>
+#include <domination.h>
 
-#define MAKE_BB(NAME) auto NAME = IR::Rewriter(#NAME, {})
-
-std::unordered_map<IR::BasicBlock *, std::set<IR::BasicBlock *>>
-find_dominators(IR::BasicBlock *start);
+#define MAKE_BB(NAME) auto NAME = IR::Rewriter(#NAME, {}); allNodes.insert(NAME.bb())
 
 void test1() {
+    std::set<IR::BasicBlock*> allNodes;
+
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -32,7 +29,7 @@ void test1() {
     std::cout << e << '\n';
     std::cout << f << '\n';
     std::cout << g << '\n';
-    auto dominators = find_dominators(a.bb());
+    auto dominators = find_dominators(a.bb(), allNodes);
 
     std::cout << "Found dominators:\n";
     for (const auto &[key, value] : dominators) {
@@ -45,6 +42,7 @@ void test1() {
 }
 
 void test2() {
+    std::set<IR::BasicBlock*> allNodes;
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -84,7 +82,7 @@ void test2() {
     std::cout << i << '\n';
     std::cout << j << '\n';
     std::cout << k << '\n';
-    auto dominators = find_dominators(a.bb());
+    auto dominators = find_dominators(a.bb(), allNodes);
 
     std::cout << "Found dominators:\n";
     for (const auto &[key, value] : dominators) {
@@ -97,6 +95,7 @@ void test2() {
 }
 
 void test3() {
+    std::set<IR::BasicBlock*> allNodes;
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -135,7 +134,7 @@ void test3() {
     std::cout << g << '\n';
     std::cout << h << '\n';
     std::cout << i << '\n';
-    auto dominators = find_dominators(a.bb());
+    auto dominators = find_dominators(a.bb(), allNodes);
 
     std::cout << "Found dominators:\n";
     for (const auto &[key, value] : dominators) {

@@ -1,29 +1,11 @@
-#include "ir.h"
-#include <set>
-#include <unordered_map>
+#include <algorithm>
+#include <domination.h>
 
 using BB = IR::BasicBlock;
 using bbSet = std::set<BB *>;
 using dominatorMap = std::unordered_map<BB *, bbSet>;
 
-bbSet find_all_children(BB *bb, bbSet &res) {
-    res.insert(bb);
-    const auto [l, r] = bb->getSuccessors();
-    if (l && !res.contains(l)) {
-        res.merge(find_all_children(l, res));
-    }
-
-    if (r && !res.contains(r)) {
-        res.merge(find_all_children(r, res));
-    }
-
-    return res;
-}
-
-dominatorMap find_dominators(BB *start) {
-    bbSet res = {};
-    auto allNodes = find_all_children(start, res);
-
+dominatorMap find_dominators(BB *start, bbSet allNodes) {
     dominatorMap dominators = {};
     for (auto *bb : allNodes) {
         dominators[bb] = allNodes;
@@ -63,17 +45,7 @@ dominatorMap find_dominators(BB *start) {
             }
 
             dominators[bb] = intersection;
-
-            // for (const auto &[key, value] : dominators) {
-            //     std::cout << "\t\t" << key->getName() << " dominators: ";
-            //     for (const auto *v : value) {
-            //         std::cout << v->getName() << ' ';
-            //     }
-            //     std::cout << '\n';
-            // }
         }
-
-        // std::cout << "changed = " << changed << '\n';
     }
 
     for (auto *bb : allNodes) {
