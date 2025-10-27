@@ -2,56 +2,6 @@
 #include <domination.h>
 
 namespace IR {
-std::vector<BB*>& _bfs(BB* bb, std::vector<BB*>& order, std::function<void (BB*)> fn) {
-    const auto [l, r] = bb->getSuccessors();
-    bool visitL = false;
-    bool visitR = false;
-
-    if (l && std::find(order.begin(), order.end(), l) == order.end()) {
-        visitL = true;
-        order.push_back(l);
-        if (fn) { fn(l); }
-    }
-    if (r && std::find(order.begin(), order.end(), r) == order.end()) {
-        visitR = true;
-        order.push_back(r);
-        if (fn) { fn(r); }
-    }
-
-    if (visitL) {
-        _bfs(l, order, fn);
-    }
-    if (visitR) {
-        _bfs(r, order, fn);
-    }
-
-    return order;
-}
-
-std::vector<BB*> bfs(BB* start, std::function<void (BB*)> fn) {
-    std::vector<BB*> order{start};
-    if (fn) { fn(start); }
-    return _bfs(start, order, fn);
-}
-
-void _dfs(BB* bb, std::vector<BB*>& order, std::function<void (BB*)> fn) {
-    if (fn) { fn(bb); }
-    order.push_back(bb);
-
-    const auto [l, r] = bb->getSuccessors();
-    if (l && std::find(order.begin(), order.end(), l) == order.end()) {
-        _dfs(l, order, fn);
-    }
-    if (r && std::find(order.begin(), order.end(), r) == order.end()) {
-        _dfs(r, order, fn);
-    }
-}
-
-std::vector<BB*> dfs(BB* start, std::function<void (BB*)> fn) {
-    std::vector<BB*> order;
-    _dfs(start, order, fn);
-    return order;
-}
 
 dominatorMap find_dominators(BB *start, bbSet allNodes) {
     dominatorMap dominators = {};
@@ -108,9 +58,6 @@ std::map<BB*, BB*> find_immediate_dominators(BB* start, dominatorMap dmap) {
     int64_t idx = 0;
     auto collect_idx = [&enumeration, &idx](BB* bb){ enumeration.insert(std::pair{bb, idx++}); };
     auto order = bfs(start, collect_idx);
-    // for (auto p : enumeration) {
-    //     std::cout << "bb " << p.first->getName() << " : " << p.second << "\n";
-    // }
 
     std::map<BB*, BB*> res = {};
     for (const auto &[bb, doms] : dmap) {

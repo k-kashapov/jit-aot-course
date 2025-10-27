@@ -3,6 +3,54 @@
 
 #define MAKE_BB(NAME) auto NAME = IR::Rewriter(#NAME, {}); allNodes.insert(NAME.bb())
 
+void testLoops(std::set<IR::BB*> allNodes, IR::BB* start) {
+    for (auto *node : allNodes) {
+        std::cout << *node << "\n";
+    }
+
+    auto dominators = find_dominators(start, allNodes);
+
+    auto backs = IR::collect_backedges(start);
+    for (auto p : backs) {
+        std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
+    }
+
+    auto loops = IR::collect_loops(dominators, backs);
+    for (auto l : loops) {
+        std::cout << "loop: header = " << l.first->getName() << "\n\tlatches: "; 
+        for (auto latch : l.second.innerBBs) {
+            std::cout << latch->getName() << " ";
+        }
+        std::cout << '\n';
+    }
+
+    std::vector<IR::BB*> postorder;
+    auto savePO = [&postorder](IR::BB* bb){ postorder.push_back(bb); };
+    IR::postorder(start, savePO);
+
+    std::cout << "postorder: "; 
+    for (auto node : postorder) {
+        for (auto backedge : backs) {
+            if (backedge.second == node) {
+                // This is a latch
+                std::cout << "This is a latch: " << backedge.first->getName() << " -> " << node->getName() << "\n";
+
+                std::vector<IR::BB*> dfsOrder;
+                auto saveDFS = [&dfsOrder](IR::BB* bb){ dfsOrder.push_back(bb); };
+                IR::reverse_dfs(backedge.first, saveDFS, node);
+
+                std::cout << " dfs found: ";
+                for (auto n : dfsOrder) {
+                    std::cout << n->getName() << "->";
+                }
+                std::cout << node->getName() << "\n";
+                break;
+            }
+        }   
+    }
+    std::cout << '\n';
+}
+
 void test1() {
     std::set<IR::BasicBlock*> allNodes;
 
@@ -23,34 +71,7 @@ void test1() {
     e->linkTrue(d.bb());
     g->linkTrue(d.bb());
 
-    for (auto *node : allNodes) {
-        std::cout << *node << "\n";
-    }
-
-    auto dominators = find_dominators(a.bb(), allNodes);
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
-
-    assert(immdoms[a.bb()] == nullptr);
-    assert(immdoms[b.bb()] == a.bb());
-    assert(immdoms[c.bb()] == b.bb());
-    assert(immdoms[d.bb()] == b.bb());
-    assert(immdoms[e.bb()] == f.bb());
-    assert(immdoms[f.bb()] == b.bb());
-    assert(immdoms[g.bb()] == f.bb());
-
-    auto backs = IR::collect_backedges(a.bb());
-    for (auto p : backs) {
-        std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
-    }
-
-    auto loops = IR::collect_loops(dominators, backs);
-    for (auto l : loops) {
-        std::cout << "loop: header = " << l.first->getName() << ";\n\tlatches: "; 
-        for (auto latch : l.second) {
-            std::cout << latch->getName() << " ";
-        }
-        std::cout << '\n';
-    }
+    testLoops(allNodes, a.bb());
 }
 
 void test2() {
@@ -83,38 +104,7 @@ void test2() {
     b->linkFalse(j.bb());
     j->linkFalse(c.bb());
 
-    for (auto *node : allNodes) {
-        std::cout << *node << "\n";
-    }
-
-    auto dominators = find_dominators(a.bb(), allNodes);
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
-
-    assert(immdoms[a.bb()] == nullptr);
-    assert(immdoms[b.bb()] == a.bb());
-    assert(immdoms[c.bb()] == b.bb());
-    assert(immdoms[d.bb()] == c.bb());
-    assert(immdoms[e.bb()] == d.bb());
-    assert(immdoms[f.bb()] == e.bb());
-    assert(immdoms[g.bb()] == f.bb());
-    assert(immdoms[h.bb()] == g.bb());
-    assert(immdoms[i.bb()] == g.bb());
-    assert(immdoms[j.bb()] == b.bb());
-    assert(immdoms[k.bb()] == i.bb());
-
-    auto backs = IR::collect_backedges(a.bb());
-    for (auto p : backs) {
-        std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
-    }
-
-    auto loops = IR::collect_loops(dominators, backs);
-    for (auto l : loops) {
-        std::cout << "loop: header = " << l.first->getName() << ";\n\tlatches: "; 
-        for (auto latch : l.second) {
-            std::cout << latch->getName() << " ";
-        }
-        std::cout << '\n';
-    }
+    testLoops(allNodes, a.bb());
 }
 
 void test3() {
@@ -148,36 +138,7 @@ void test3() {
 
     f->linkFalse(b.bb());
 
-    for (auto *node : allNodes) {
-        std::cout << *node << "\n";
-    }
-
-    auto dominators = find_dominators(a.bb(), allNodes);
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
-
-    assert(immdoms[a.bb()] == nullptr);
-    assert(immdoms[b.bb()] == a.bb());
-    assert(immdoms[c.bb()] == b.bb());
-    assert(immdoms[d.bb()] == b.bb());
-    assert(immdoms[e.bb()] == b.bb());
-    assert(immdoms[f.bb()] == e.bb());
-    assert(immdoms[g.bb()] == b.bb());
-    assert(immdoms[h.bb()] == f.bb());
-    assert(immdoms[i.bb()] == b.bb());
-
-    auto backs = IR::collect_backedges(a.bb());
-    for (auto p : backs) {
-        std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
-    }
-
-    auto loops = IR::collect_loops(dominators, backs);
-    for (auto l : loops) {
-        std::cout << "loop: header = " << l.first->getName() << ";\n\tlatches: "; 
-        for (auto latch : l.second) {
-            std::cout << latch->getName() << " ";
-        }
-        std::cout << '\n';
-    }
+    testLoops(allNodes, a.bb());
 }
 
 void test4() {
@@ -194,26 +155,7 @@ void test4() {
     d->linkTrue(e.bb());
     e->linkFalse(b.bb());
 
-    for (auto *node : allNodes) {
-        std::cout << *node << "\n";
-    }
-
-    auto dominators = find_dominators(a.bb(), allNodes);
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
-
-    auto backs = IR::collect_backedges(a.bb());
-    for (auto p : backs) {
-        std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
-    }
-
-    auto loops = IR::collect_loops(dominators, backs);
-    for (auto l : loops) {
-        std::cout << "loop: header = " << l.first->getName() << ";\n\tlatches: "; 
-        for (auto latch : l.second) {
-            std::cout << latch->getName() << " ";
-        }
-        std::cout << '\n';
-    }
+    testLoops(allNodes, a.bb());
 }
 
 void test5() {
@@ -233,26 +175,7 @@ void test5() {
     d->linkTrue(e.bb());
     e->linkTrue(b.bb());
 
-    for (auto *node : allNodes) {
-        std::cout << *node << "\n";
-    }
-
-    auto dominators = find_dominators(a.bb(), allNodes);
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
-
-    auto backs = IR::collect_backedges(a.bb());
-    for (auto p : backs) {
-        std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
-    }
-
-    auto loops = IR::collect_loops(dominators, backs);
-    for (auto l : loops) {
-        std::cout << "loop: header = " << l.first->getName() << ";\n\tlatches: "; 
-        for (auto latch : l.second) {
-            std::cout << latch->getName() << " ";
-        }
-        std::cout << '\n';
-    }
+    testLoops(allNodes, a.bb());
 }
 
 void test6() {
@@ -281,26 +204,7 @@ void test6() {
     g->linkFalse(b.bb());
     h->linkFalse(a.bb());
 
-    for (auto *node : allNodes) {
-        std::cout << *node << "\n";
-    }
-
-    auto dominators = find_dominators(a.bb(), allNodes);
-    auto immdoms = find_immediate_dominators(a.bb(), dominators);
-
-    auto backs = IR::collect_backedges(a.bb());
-    for (auto p : backs) {
-        std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
-    }
-
-    auto loops = IR::collect_loops(dominators, backs);
-    for (auto l : loops) {
-        std::cout << "loop: header = " << l.first->getName() << ";\n\tlatches: "; 
-        for (auto latch : l.second) {
-            std::cout << latch->getName() << " ";
-        }
-        std::cout << '\n';
-    }
+    testLoops(allNodes, a.bb());
 }
 
 int main() {

@@ -1,12 +1,21 @@
+#ifndef IR_LOOP_H
+#define IR_LOOP_H
+
 #include <domination.h>
+#include <utils.h>
 
 namespace IR {
 
-using bbSet = std::set<BB*>;
-using edge = std::pair<BB*, BB*>;
-using Loops = std::map<BB*, bbSet>;
+struct Loop {
+    std::set<Loop*> innerLoops;
+    bbSet innerBBs;
+};
+
+using LoopMap = std::map<BB*, Loop>;
 
 std::set<edge> collect_backedges(IR::BB* start);
-Loops collect_loops(dominatorMap dmap, std::set<edge> backedges);
+LoopMap collect_loops(dominatorMap dmap, std::set<edge> backedges);
 
 };
+
+#endif // IR_LOOP_H

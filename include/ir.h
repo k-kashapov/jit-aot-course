@@ -173,27 +173,7 @@ class BasicBlock {
 
 // class Function {
 //     std::list<BasicBlock> bbs;
-
-//   public:
-//     Function() {}
-//     Function(std::initializer_list<BasicBlock> blocks) : bbs(blocks) {}
-
-//     BasicBlock *addBB(BasicBlock &bb) {
-//         bbs.push_back(bb);
-//         return &bbs.back();
-//     }
-
-//     BasicBlock *insertBB(BasicBlock &pos, BasicBlock &bb) {
-//         auto iter = std::find(bbs.begin(), bbs.end(), pos);
-//         auto &res = *bbs.insert(iter, bb);
-//         return &res;
-//     }
-
-//     BasicBlock *insertBBAfter(BasicBlock &pos, BasicBlock &bb) {
-//         auto iter = std::find(bbs.begin(), bbs.end(), pos);
-//         auto &res = *bbs.insert(iter++, bb);
-//         return &res;
-//     }
+//     TODO: implement
 // };
 
 class Rewriter {
