@@ -39,6 +39,13 @@ void test1() {
         }
         std::cout << '\n';
     }
+
+    auto immdoms = find_immediate_dominators(a.bb(), dominators);
+    for (const auto &[key, value] : immdoms) {
+        // std::cout << key << ", " << value << "\n";
+        std::cout << key->getName() << " immediate dominator: ";
+        std::cout << (value ? value->getName() : "none") << "\n";
+    }
 }
 
 void test2() {
@@ -92,6 +99,13 @@ void test2() {
         }
         std::cout << '\n';
     }
+
+    auto immdoms = find_immediate_dominators(a.bb(), dominators);
+    for (const auto &[key, value] : immdoms) {
+        // std::cout << key << ", " << value << "\n";
+        std::cout << key->getName() << " immediate dominator: ";
+        std::cout << (value ? value->getName() : "none") << "\n";
+    }
 }
 
 void test3() {
@@ -143,6 +157,13 @@ void test3() {
             std::cout << v->getName() << ' ';
         }
         std::cout << '\n';
+    }
+
+    auto immdoms = find_immediate_dominators(a.bb(), dominators);
+    for (const auto &[key, value] : immdoms) {
+        // std::cout << key << ", " << value << "\n";
+        std::cout << key->getName() << " immediate dominator: ";
+        std::cout << (value ? value->getName() : "none") << "\n";
     }
 }
 

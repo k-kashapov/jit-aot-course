@@ -5,6 +5,37 @@ using BB = IR::BasicBlock;
 using bbSet = std::set<BB *>;
 using dominatorMap = std::unordered_map<BB *, bbSet>;
 
+std::map<BB*, int64_t>& _bfs(BB* bb, std::map<BB*, int64_t>& res, int64_t &idx) {
+    const auto [l, r] = bb->getSuccessors();
+    bool visitL = false;
+    bool visitR = false;
+
+    if (l && !res.contains(l)) {
+        visitL = true;
+        res.emplace(std::pair{l, idx++});
+    }
+    if (r && !res.contains(r)) {
+        visitR = true;
+        res.emplace(std::pair{r, idx++});
+    }
+
+    if (visitL) {
+        _bfs(l, res, idx);
+    }
+    if (visitR) {
+        _bfs(r, res, idx);
+    }
+
+    return res;
+}
+
+std::map<BB*, int64_t> bfs(BB* bb) {
+    std::map<BB*, int64_t> res{std::pair(bb, 0)};
+    int64_t idx = 1;
+
+    return _bfs(bb, res, idx);
+}
+
 dominatorMap find_dominators(BB *start, bbSet allNodes) {
     dominatorMap dominators = {};
     for (auto *bb : allNodes) {
@@ -53,4 +84,28 @@ dominatorMap find_dominators(BB *start, bbSet allNodes) {
     }
 
     return dominators;
+}
+
+std::map<BB*, BB*> find_immediate_dominators(BB* start, dominatorMap dmap) {
+    auto enumeration = bfs(start);
+    for (auto p : enumeration) {
+        std::cout << "bb " << p.first->getName() << " : " << p.second << "\n";
+    }
+
+    std::map<BB*, BB*> res = {};
+    for (const auto &[bb, doms] : dmap) {
+        int64_t max_dom_idx = -1;
+        BB* immdom = nullptr;
+        for (const auto dom : doms) {
+            int64_t enum_idx = enumeration[dom];
+            if (enum_idx > max_dom_idx) {
+                max_dom_idx = enum_idx;
+                immdom = dom;
+            }
+        }
+
+        res[bb] = immdom;
+    }
+
+    return res;
 }
