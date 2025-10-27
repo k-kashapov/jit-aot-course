@@ -5,35 +5,56 @@ using BB = IR::BasicBlock;
 using bbSet = std::set<BB *>;
 using dominatorMap = std::unordered_map<BB *, bbSet>;
 
-std::map<BB*, int64_t>& _bfs(BB* bb, std::map<BB*, int64_t>& res, int64_t &idx) {
+std::vector<BB*>& _bfs(BB* bb, std::vector<BB*>& order, std::function<void (BB*)> fn) {
     const auto [l, r] = bb->getSuccessors();
     bool visitL = false;
     bool visitR = false;
 
-    if (l && !res.contains(l)) {
+    if (l && std::find(order.begin(), order.end(), l) == order.end()) {
         visitL = true;
-        res.emplace(std::pair{l, idx++});
+        order.push_back(l);
+        if (fn) { fn(l); }
     }
-    if (r && !res.contains(r)) {
+    if (r && std::find(order.begin(), order.end(), r) == order.end()) {
         visitR = true;
-        res.emplace(std::pair{r, idx++});
+        order.push_back(r);
+        if (fn) { fn(r); }
     }
 
     if (visitL) {
-        _bfs(l, res, idx);
+        _bfs(l, order, fn);
     }
     if (visitR) {
-        _bfs(r, res, idx);
+        _bfs(r, order, fn);
     }
 
-    return res;
+    return order;
 }
 
-std::map<BB*, int64_t> bfs(BB* bb) {
-    std::map<BB*, int64_t> res{std::pair(bb, 0)};
-    int64_t idx = 1;
+std::vector<BB*> bfs(BB* start, std::function<void (BB*)> fn) {
+    std::vector<BB*> order{start};
+    if (fn) { fn(start); }
+    return _bfs(start, order, fn);
+}
 
-    return _bfs(bb, res, idx);
+std::vector<BB*>& _dfs(BB* bb, std::vector<BB*>& order, std::function<void (BB*)> fn) {
+    if (fn) { fn(bb); }
+    order.push_back(bb);
+
+    const auto [l, r] = bb->getSuccessors();
+    if (l && std::find(order.begin(), order.end(), l) == order.end()) {
+        _dfs(l, order, fn);
+    }
+    if (r && std::find(order.begin(), order.end(), r) == order.end()) {
+        _dfs(r, order, fn);
+    }
+
+    return order;
+}
+
+std::vector<BB*> dfs(BB* start, std::function<void (BB*)> fn) {
+    std::vector<BB*> order;
+    return _dfs(start, order, fn);
 }
 
 dominatorMap find_dominators(BB *start, bbSet allNodes) {
@@ -87,10 +108,13 @@ dominatorMap find_dominators(BB *start, bbSet allNodes) {
 }
 
 std::map<BB*, BB*> find_immediate_dominators(BB* start, dominatorMap dmap) {
-    auto enumeration = bfs(start);
-    for (auto p : enumeration) {
-        std::cout << "bb " << p.first->getName() << " : " << p.second << "\n";
-    }
+    std::map<BB*, int64_t> enumeration;
+    int64_t idx = 0;
+    auto collect_idx = [&enumeration, &idx](BB* bb){ enumeration.insert(std::pair{bb, idx++}); };
+    auto order = bfs(start, collect_idx);
+    // for (auto p : enumeration) {
+    //     std::cout << "bb " << p.first->getName() << " : " << p.second << "\n";
+    // }
 
     std::map<BB*, BB*> res = {};
     for (const auto &[bb, doms] : dmap) {
