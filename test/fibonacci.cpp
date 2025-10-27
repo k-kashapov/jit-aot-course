@@ -17,19 +17,21 @@ int main() {
     one = IR::Op::create<IR::ConstOp>(IR::EType::UI32, 1);
     auto sub1 = IR::Op::create<IR::SubOp>(IR::EType::UI32, n, one);
 
-    auto call = IR::Op::create<IR::CallOp>(IR::EType::UI32, start.bb(), std::initializer_list{static_cast<IR::Op*>(sub1)});
+    auto call = IR::Op::create<IR::CallOp>(IR::EType::UI32, start.bb(),
+                                           IR::Op::Range{sub1});
     auto loopBB = IR::Rewriter("loopBB", {sub1, call});
 
     loopBB->addOp(one);
-    start->linkSucc(loopBB.bb(), true);
-    
-    auto phiN = IR::Op::create<IR::PhiNode>(IR::EType::UI32, std::initializer_list<IR::Op*>{n, sub1});
+    start->linkFalse(loopBB.bb());
+
+    auto phiN =
+        IR::Op::create<IR::PhiNode>(IR::EType::UI32, IR::Op::Range{n, sub1});
     start->insertOp(one, phiN);
 
     auto ret = IR::Op::create<IR::RetOp>(IR::EType::None, one);
     auto exitBB = IR::Rewriter("exitBB", {ret});
 
-    start->linkSucc(exitBB.bb());
+    start->linkTrue(exitBB.bb());
 
     auto condBr = IR::Op::create<IR::CondBrOp>(IR::EType::None, zeroOrOne, exitBB.bb());
     start->addOp(condBr);

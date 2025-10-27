@@ -6,6 +6,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "types.h"
 
@@ -45,14 +46,7 @@ class Op {
     virtual std::ostream &stringify(std::ostream &os) const = 0;
 
   public:
-    // template <typename Ty, class... Args>
-    // requires std::is_base_of_v<Op, Ty>
-    // static Ty *create(int64_t id, Type ty, Args... args) {
-    //     auto res = new Ty(args...);
-    //     res->_id = id;
-    //     res->_type = ty;
-    //     return res;
-    // }
+    using Range = std::initializer_list<Op*>;
 
     template <typename Ty, class... Args>
     requires std::is_base_of_v<Op, Ty>
@@ -87,7 +81,7 @@ class BasicBlock {
     using opPtr = std::unique_ptr<Op>;
 
     int64_t _ops_free_id = 0;
-    std::list<BasicBlock *> _preds; // TODO: change to vector?
+    std::vector<BasicBlock *> _preds;
     std::string _name;
     std::list<opPtr> _ops;
     BasicBlock * _cond_true_succ = nullptr;
@@ -134,13 +128,13 @@ class BasicBlock {
         return ret;
     }
 
-    void linkSucc(BasicBlock *bb, bool onFail = false) {
-        if (onFail) {
-            setCondFailSucc(bb);
-        } else {
-            setSucc(bb);
-        }
+    void linkTrue(BasicBlock *bb) {
+        setSucc(bb);
+        bb->addPred(this);
+    }
 
+    void linkFalse(BasicBlock *bb) {
+        setCondFailSucc(bb);
         bb->addPred(this);
     }
 
@@ -148,7 +142,7 @@ class BasicBlock {
 
     const std::pair<BasicBlock *, BasicBlock *> getSuccessors() const { return {_cond_true_succ, _cond_fail_succ}; }
 
-    const std::list<BasicBlock *> &getPreds() const { return _preds; }
+    const std::vector<BasicBlock *> &getPreds() const { return _preds; }
 
     friend std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
         auto printName = [](decltype(bb._preds.begin()) i) { return (*i)->getName(); };

@@ -119,7 +119,7 @@ class JumpOp : public Op {
 
     virtual void setBB(BasicBlock *bb) override {
         _bb = bb;
-        _bb->linkSucc(_dest);
+        _bb->linkTrue(_dest);
     }
 
     virtual bool verify() const override { return _dest != nullptr; }
@@ -145,7 +145,7 @@ class CondBrOp : public Op { // TODO: check successors number and branch to succ
 
     virtual void setBB(BasicBlock *bb) override {
         _bb = bb;
-        _bb->linkSucc(_dest);
+        _bb->linkTrue(_dest);
     }
 
     virtual bool verify() const override {
@@ -198,7 +198,7 @@ class CallOp : public Op {
 
     virtual void setBB(BasicBlock *bb) override {
         _bb = bb;
-        _bb->linkSucc(_dest);
+        _bb->linkTrue(_dest);
     }
 
     virtual bool verify() const override {
