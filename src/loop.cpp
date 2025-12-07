@@ -2,14 +2,14 @@
 
 namespace IR {
 
-void do_collect(BB* bb, bbSet& visited, bbSet& gray, std::set<edge> &backedges) {
+void do_collect(BB* bb, bbSet& visited, bbSet& gray, std::map<BB*, BB*> &backedges) {
     gray.insert(bb);
     visited.insert(bb);
 
     const auto [l, r] = bb->getSuccessors();
     if (l) {
         if (gray.contains(l)) {
-            backedges.insert(edge(bb, l));
+            backedges.insert({l, bb});
         }
 
         if (!visited.contains(l)) {
@@ -19,7 +19,7 @@ void do_collect(BB* bb, bbSet& visited, bbSet& gray, std::set<edge> &backedges) 
 
     if (r) {
         if (gray.contains(r)) {
-            backedges.insert(edge(bb, r));
+            backedges.insert({r, bb});
         }
 
         if (!visited.contains(r)) {
@@ -30,27 +30,31 @@ void do_collect(BB* bb, bbSet& visited, bbSet& gray, std::set<edge> &backedges) 
     gray.erase(bb);
 }
 
-std::set<edge> collect_backedges(BB* start) {
+std::map<BB*, BB*> collect_backedges(BB* start) {
     bbSet gray;
     bbSet visited;
-    std::set<edge> backedges;
+    std::map<BB*, BB*> backedges;
     do_collect(start, visited, gray, backedges);
 
     return backedges;
 }
 
-LoopMap collect_loops(dominatorMap dmap, std::set<edge> backedges) {
+LoopMap collect_loops(dominatorMap dmap, std::map<BB*, BB*> backedges) {
     LoopMap loops;
 
     for (auto &b : backedges) {
-        BB* header = b.second;
-        BB* latch = b.first;
+        BB* header = b.first;
+        BB* latch = b.second;
+
+        // std::cout << "backedge = " << latch->getName() << "->" << header->getName() << "\n";
 
         if (!dmap[latch].contains(header)) {
             continue;
         }
 
-        auto [headerIter, inserted] = loops.insert(std::pair{header, Loop({}, {latch})});
+        // std::cout << "header = " << header << "\n";
+
+        auto [headerIter, inserted] = loops.insert(std::pair{header, Loop(header, {}, {latch})});
         if (!inserted) {
             headerIter->second.innerBBs.insert(latch);
         }
@@ -59,35 +63,53 @@ LoopMap collect_loops(dominatorMap dmap, std::set<edge> backedges) {
     return loops;
 }
 
-std::map<IR::BB*, std::vector<IR::BB*>> FindAllLoops(IR::Function& func, IR::BB* start) {
+std::map<BB*, Loop> FindAllLoops(IR::Function& func, IR::BB* start) {
     auto allNodes = func.getBBs();
     auto dominators = find_dominators(start, allNodes);
 
     auto backs = IR::collect_backedges(start);
     auto loops = IR::collect_loops(dominators, backs);
 
-    std::vector<IR::BB*> postorder;
-    auto savePO = [&postorder](IR::BB* bb){ postorder.push_back(bb); };
+    std::vector<IR::BB*> allNodesPostorder;
+    auto savePO = [&allNodesPostorder](IR::BB* bb){ allNodesPostorder.push_back(bb); };
     IR::postorder(start, savePO);
 
-    std::map<IR::BB*, std::vector<IR::BB*>> latch_to_loop;
+    std::map<IR::BB*, IR::Loop*> bbToLoopMapping;
 
-    for (auto node : postorder) {
-        for (auto backedge : backs) {
-            if (backedge.second == node) {
-                // This is a latch
+    // std::cout << "postorder:\n"; 
+    for (auto node : allNodesPostorder) {
+        if (loops.find(node) != loops.end()) {
+            auto backedgeIter = backs.find(node);
+            auto header = backedgeIter->first;
+            auto latch = backedgeIter->second;
+            // std::cout << "\theader = " << header->getName() << "\n";
+            // std::cout << "\tlatch = " << latch->getName() << "\n";
 
-                std::vector<IR::BB*> dfsOrder;
-                auto saveDFS = [&dfsOrder](IR::BB* bb){ dfsOrder.push_back(bb); };
-                IR::reverse_dfs(backedge.first, saveDFS, node);
+            std::vector<IR::BB*> dfsOrder;
+            auto saveDFS = [&dfsOrder](IR::BB* bb){ dfsOrder.push_back(bb); };
+            IR::reverse_dfs(latch, saveDFS, header);
 
-                latch_to_loop[node] = dfsOrder;
-                break;
+            // std::cout << " dfs found: ";
+            for (auto bbToAdd : dfsOrder) {
+                // std::cout << bbToAdd->getName() << "<-";
+
+                auto visitedIter = bbToLoopMapping.find(bbToAdd);
+                if (visitedIter != bbToLoopMapping.end()) {
+                    loops[header].innerLoops.insert(visitedIter->second);
+                } else {
+                    loops[header].innerBBs.insert(bbToAdd);
+                    bbToLoopMapping[bbToAdd] = &loops[header];
+                }
             }
-        }   
+
+            // std::cout << header->getName() << "\n";
+        } else {
+            // std::cout << "\tnot a latch: " << node->getName() << "\n";
+        }
     }
 
-    return latch_to_loop;
+    // std::cout << '\n';
+    return loops;
 }
 
 

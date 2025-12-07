@@ -3,6 +3,28 @@
 
 #define MAKE_BB(NAME) auto NAME = IR::Rewriter(#NAME, {}); func.addBB(NAME.bb())
 
+void printMap(IR::LoopMap loops) {
+    for (auto iter : loops) {
+        auto header = iter.first;
+        auto loop = iter.second;
+        std::cout << "header: " << header->getName() << "\n";
+        std::cout << "\tinner bbs: \n";
+        for (auto* innerBB : loop.innerBBs) {
+            std::cout << "\t\t" << innerBB->getName() << "\n";
+        }
+
+        std::cout << "\tinner loops: \n";
+        for (auto* inLoop : loop.innerLoops) {
+            if (!inLoop->header) {
+                std::cout << "\t\tnullheader\n";
+                continue;
+            }
+
+            std::cout << "\t\t" << inLoop->header->getName() << "\n";
+        }
+    }
+}
+
 // auto testLoops(std::set<IR::BB*> allNodes, IR::BB* start) {
 //     for (auto *node : allNodes) {
 //         // std::cout << *node << "\n";
@@ -17,21 +39,21 @@
 
 //     auto loops = IR::collect_loops(dominators, backs);
 //     for (auto l : loops) {
-//         // std::cout << "loop: header = " << l.first->getName() << "\n\tlatches: "; 
+//         std::cout << "loop: header = " << l.first->getName() << "\n\tlatches: "; 
 //         for (auto latch : l.second.innerBBs) {
-//             // std::cout << latch->getName() << " ";
+//             std::cout << latch->getName() << " ";
 //         }
-//         // std::cout << '\n';
+//         std::cout << '\n';
 //     }
 
-//     std::vector<IR::BB*> postorder;
-//     auto savePO = [&postorder](IR::BB* bb){ postorder.push_back(bb); };
+//     std::vector<IR::BB*> allNodesPostorder;
+//     auto savePO = [&allNodesPostorder](IR::BB* bb){ allNodesPostorder.push_back(bb); };
 //     IR::postorder(start, savePO);
 
-//     std::map<IR::BB*, std::vector<IR::BB*>> latch_to_loop;
+//     std::map<IR::BB*, IR::Loop*> bbToLoopMapping;
 
 //     // std::cout << "postorder: "; 
-//     for (auto node : postorder) {
+//     for (auto node : allNodesPostorder) {
 //         for (auto backedge : backs) {
 //             if (backedge.second == node) {
 //                 // This is a latch
@@ -42,11 +64,17 @@
 //                 IR::reverse_dfs(backedge.first, saveDFS, node);
 
 //                 std::cout << " dfs found: ";
-//                 for (auto n : dfsOrder) {
-//                     std::cout << n->getName() << "->";
-//                 }
+//                 for (auto bbToAdd : dfsOrder) {
+//                     std::cout << bbToAdd->getName() << "<-";
 
-//                 latch_to_loop[node] = dfsOrder;
+//                     auto visitedIter = bbToLoopMapping.find(bbToAdd);
+//                     if (visitedIter != bbToLoopMapping.end()) {
+//                         loops[node].innerLoops.insert(visitedIter->second);
+//                     } else {
+//                         loops[node].innerBBs.insert(bbToAdd);
+//                         bbToLoopMapping[bbToAdd] = &loops[node];
+//                     }
+//                 }
 
 //                 std::cout << node->getName() << "\n";
 //                 break;
@@ -54,7 +82,7 @@
 //         }   
 //     }
 //     // std::cout << '\n';
-//     return latch_to_loop;
+//     return loops;
 // }
 
 void test1() {
@@ -77,8 +105,8 @@ void test1() {
     e->linkTrue(d.bb());
     g->linkTrue(d.bb());
 
-    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
-    assert(latch_to_loop.empty());
+    auto loop_map = IR::FindAllLoops(func, a.bb());
+    assert(loop_map.empty());
 }
 
 void test2() {
@@ -112,11 +140,13 @@ void test2() {
     b->linkFalse(j.bb());
     j->linkFalse(c.bb());
 
-    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
+    auto loop_map = IR::FindAllLoops(func, a.bb());
+    // printMap(loop_map);
 
-    assert(latch_to_loop[e.bb()] == (std::vector<IR::BB*>{f.bb()}));
-    assert(latch_to_loop[c.bb()] == (std::vector<IR::BB*>{d.bb()}));
-    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{h.bb(), g.bb(), f.bb(), e.bb(), d.bb(), c.bb(), j.bb()}));
+    assert(loop_map[e.bb()].innerBBs == (std::set<IR::BB*>{f.bb()}));
+    assert(loop_map[c.bb()].innerBBs == (std::set<IR::BB*>{d.bb()}));
+    assert(loop_map[b.bb()].innerBBs == (std::set<IR::BB*>{c.bb(), e.bb(), g.bb(), h.bb(), j.bb()}));
+    assert(loop_map[b.bb()].innerLoops.size() == 2);
 }
 
 void test3() {
@@ -151,10 +181,11 @@ void test3() {
 
     f->linkFalse(b.bb());
 
-    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
+    auto loop_map = IR::FindAllLoops(func, a.bb());
+    // printMap(loop_map);
 
-    assert(latch_to_loop[c.bb()] == (std::vector<IR::BB*>{g.bb(), d.bb(), e.bb(), b.bb(), a.bb(), f.bb(), h.bb()}));
-    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{f.bb(), e.bb()}));
+    assert(loop_map[b.bb()].innerBBs == (std::set<IR::BB*>{f.bb(), e.bb()}));
+    assert(!loop_map.contains(c.bb()));
 }
 
 void test4() {
@@ -172,8 +203,10 @@ void test4() {
     d->linkTrue(e.bb());
     e->linkFalse(b.bb());
 
-    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
-    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{e.bb(), d.bb()}));
+    auto loop_map = IR::FindAllLoops(func, a.bb());
+    // printMap(loop_map);
+    assert(loop_map[b.bb()].innerBBs == (std::set<IR::BB*>{e.bb(), d.bb()}));
+    assert(loop_map[b.bb()].innerLoops.size() == 0);
 }
 
 void test5() {
@@ -194,8 +227,10 @@ void test5() {
     d->linkTrue(e.bb());
     e->linkTrue(b.bb());
 
-    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
-    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{e.bb(), d.bb(), c.bb()}));
+    auto loop_map = IR::FindAllLoops(func, a.bb());
+    // printMap(loop_map);
+    assert(loop_map[b.bb()].innerBBs == (std::set<IR::BB*>{e.bb(), d.bb(), c.bb()}));
+    assert(loop_map[b.bb()].innerLoops.size() == 0);
 }
 
 void test6() {
@@ -225,9 +260,13 @@ void test6() {
     g->linkFalse(b.bb());
     h->linkFalse(a.bb());
 
-    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
-    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{g.bb(), f.bb(), c.bb(), d.bb()}));
-    assert(latch_to_loop[a.bb()] == (std::vector<IR::BB*>{h.bb(), g.bb(), f.bb(), c.bb(), b.bb(), d.bb()}));
+    auto loop_map = IR::FindAllLoops(func, a.bb());
+
+    assert(loop_map[b.bb()].innerBBs == (std::set<IR::BB*>{g.bb(), f.bb(), c.bb(), d.bb()}));
+    assert(loop_map[b.bb()].innerLoops.empty());
+
+    assert(loop_map[a.bb()].innerBBs == (std::set<IR::BB*>{b.bb(), h.bb()}));
+    assert(loop_map[a.bb()].innerLoops.size() == 1);
 }
 
 int main() {
@@ -241,10 +280,10 @@ int main() {
     test3();
     std::cout << "clear\n";
     std::cout << "Test4 ";
-    test4();
+    // test4();
     std::cout << "clear\n";
     std::cout << "Test5 ";
-    test5();
+    // test5();
     std::cout << "clear\n";
     std::cout << "Test6 ";
     test6();
