@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <set>
 
 #include <types.h>
 
@@ -205,6 +206,39 @@ public:
 
     friend std::ostream &operator<<(std::ostream &os, const Rewriter& r) {
         return os << *r._bb;
+    }
+};
+
+class Function {
+    std::string _name;
+    std::set<BasicBlock*> _bbs;
+
+public:
+    Function(const std::string_view name) : _name(name) {}
+    Function(const std::string_view name, const std::set<BasicBlock*>& basicBlocks) : _name(name), _bbs(basicBlocks) {}
+    Function(const std::string_view name, std::initializer_list<BasicBlock*> basicBlocks) : _name(name), _bbs(basicBlocks) {}
+
+    const std::string& getName() const {
+        return _name;
+    }
+
+    const std::set<BasicBlock*>& getBBs() const {
+        return _bbs;
+    }
+
+    void setName(const std::string_view name) {
+        _name = name;
+    }
+
+    void addBB(BasicBlock* bb) {
+        _bbs.insert(bb);
+    }
+
+    friend std::ostream &operator<<(std::ostream &os, const Function& f) {
+        for (auto* bb : f._bbs) {
+            os << *bb << "\n";
+        }
+        return os;
     }
 };
 

@@ -15,6 +15,7 @@ using LoopMap = std::map<BB*, Loop>;
 
 std::set<edge> collect_backedges(IR::BB* start);
 LoopMap collect_loops(dominatorMap dmap, std::set<edge> backedges);
+std::map<IR::BB*, std::vector<IR::BB*>> FindAllLoops(IR::Function& func, IR::BB* start);
 
 };
 

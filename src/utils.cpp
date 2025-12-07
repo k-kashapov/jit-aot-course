@@ -53,16 +53,16 @@ void dfs(BB* start, bbFunc fn) {
 }
 
 void _reverse_dfs(BB* bb, bbSet& visited, bbFunc fn) {
-    std::cout << "\tvisiting " << bb->getName() << '\n';
+    // std::cout << "\tvisiting " << bb->getName() << '\n';
     if (fn) { fn(bb); }
     visited.insert(bb);
 
     for (auto p : bb->getPreds()) {
-        std::cout << "\t\tpred " << p->getName() << ' ';
+        // std::cout << "\t\tpred " << p->getName() << ' ';
         if (p && !visited.contains(p)) {
-            std::cout << "has not been visited\n";
+            // std::cout << "has not been visited\n";
             _reverse_dfs(p, visited, fn);
-            std::cout << "\t\treturning to " << bb->getName() << "\n";
+            // std::cout << "\t\treturning to " << bb->getName() << "\n";
         }
     }
 }

@@ -1,58 +1,64 @@
 #include <cassert>
 #include <loop.h>
 
-#define MAKE_BB(NAME) auto NAME = IR::Rewriter(#NAME, {}); allNodes.insert(NAME.bb())
+#define MAKE_BB(NAME) auto NAME = IR::Rewriter(#NAME, {}); func.addBB(NAME.bb())
 
-void testLoops(std::set<IR::BB*> allNodes, IR::BB* start) {
-    for (auto *node : allNodes) {
-        std::cout << *node << "\n";
-    }
+// auto testLoops(std::set<IR::BB*> allNodes, IR::BB* start) {
+//     for (auto *node : allNodes) {
+//         // std::cout << *node << "\n";
+//     }
 
-    auto dominators = find_dominators(start, allNodes);
+//     auto dominators = find_dominators(start, allNodes);
 
-    auto backs = IR::collect_backedges(start);
-    for (auto p : backs) {
-        std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
-    }
+//     auto backs = IR::collect_backedges(start);
+//     for (auto p : backs) {
+//         // std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
+//     }
 
-    auto loops = IR::collect_loops(dominators, backs);
-    for (auto l : loops) {
-        std::cout << "loop: header = " << l.first->getName() << "\n\tlatches: "; 
-        for (auto latch : l.second.innerBBs) {
-            std::cout << latch->getName() << " ";
-        }
-        std::cout << '\n';
-    }
+//     auto loops = IR::collect_loops(dominators, backs);
+//     for (auto l : loops) {
+//         // std::cout << "loop: header = " << l.first->getName() << "\n\tlatches: "; 
+//         for (auto latch : l.second.innerBBs) {
+//             // std::cout << latch->getName() << " ";
+//         }
+//         // std::cout << '\n';
+//     }
 
-    std::vector<IR::BB*> postorder;
-    auto savePO = [&postorder](IR::BB* bb){ postorder.push_back(bb); };
-    IR::postorder(start, savePO);
+//     std::vector<IR::BB*> postorder;
+//     auto savePO = [&postorder](IR::BB* bb){ postorder.push_back(bb); };
+//     IR::postorder(start, savePO);
 
-    std::cout << "postorder: "; 
-    for (auto node : postorder) {
-        for (auto backedge : backs) {
-            if (backedge.second == node) {
-                // This is a latch
-                std::cout << "This is a latch: " << backedge.first->getName() << " -> " << node->getName() << "\n";
+//     std::map<IR::BB*, std::vector<IR::BB*>> latch_to_loop;
 
-                std::vector<IR::BB*> dfsOrder;
-                auto saveDFS = [&dfsOrder](IR::BB* bb){ dfsOrder.push_back(bb); };
-                IR::reverse_dfs(backedge.first, saveDFS, node);
+//     // std::cout << "postorder: "; 
+//     for (auto node : postorder) {
+//         for (auto backedge : backs) {
+//             if (backedge.second == node) {
+//                 // This is a latch
+//                 // std::cout << "This is a latch: " << backedge.first->getName() << " -> " << node->getName() << "\n";
 
-                std::cout << " dfs found: ";
-                for (auto n : dfsOrder) {
-                    std::cout << n->getName() << "->";
-                }
-                std::cout << node->getName() << "\n";
-                break;
-            }
-        }   
-    }
-    std::cout << '\n';
-}
+//                 std::vector<IR::BB*> dfsOrder;
+//                 auto saveDFS = [&dfsOrder](IR::BB* bb){ dfsOrder.push_back(bb); };
+//                 IR::reverse_dfs(backedge.first, saveDFS, node);
+
+//                 std::cout << " dfs found: ";
+//                 for (auto n : dfsOrder) {
+//                     std::cout << n->getName() << "->";
+//                 }
+
+//                 latch_to_loop[node] = dfsOrder;
+
+//                 std::cout << node->getName() << "\n";
+//                 break;
+//             }
+//         }   
+//     }
+//     // std::cout << '\n';
+//     return latch_to_loop;
+// }
 
 void test1() {
-    std::set<IR::BasicBlock*> allNodes;
+    IR::Function func("test1");
 
     MAKE_BB(a);
     MAKE_BB(b);
@@ -71,11 +77,13 @@ void test1() {
     e->linkTrue(d.bb());
     g->linkTrue(d.bb());
 
-    testLoops(allNodes, a.bb());
+    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
+    assert(latch_to_loop.empty());
 }
 
 void test2() {
-    std::set<IR::BasicBlock*> allNodes;
+    IR::Function func("test2");
+
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -104,11 +112,16 @@ void test2() {
     b->linkFalse(j.bb());
     j->linkFalse(c.bb());
 
-    testLoops(allNodes, a.bb());
+    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
+
+    assert(latch_to_loop[e.bb()] == (std::vector<IR::BB*>{f.bb()}));
+    assert(latch_to_loop[c.bb()] == (std::vector<IR::BB*>{d.bb()}));
+    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{h.bb(), g.bb(), f.bb(), e.bb(), d.bb(), c.bb(), j.bb()}));
 }
 
 void test3() {
-    std::set<IR::BasicBlock*> allNodes;
+    IR::Function func("test3");
+
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -138,11 +151,15 @@ void test3() {
 
     f->linkFalse(b.bb());
 
-    testLoops(allNodes, a.bb());
+    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
+
+    assert(latch_to_loop[c.bb()] == (std::vector<IR::BB*>{g.bb(), d.bb(), e.bb(), b.bb(), a.bb(), f.bb(), h.bb()}));
+    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{f.bb(), e.bb()}));
 }
 
 void test4() {
-    std::set<IR::BasicBlock*> allNodes;
+    IR::Function func("test4");
+
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -155,11 +172,13 @@ void test4() {
     d->linkTrue(e.bb());
     e->linkFalse(b.bb());
 
-    testLoops(allNodes, a.bb());
+    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
+    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{e.bb(), d.bb()}));
 }
 
 void test5() {
-    std::set<IR::BasicBlock*> allNodes;
+    IR::Function func("test5");
+
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -175,11 +194,13 @@ void test5() {
     d->linkTrue(e.bb());
     e->linkTrue(b.bb());
 
-    testLoops(allNodes, a.bb());
+    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
+    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{e.bb(), d.bb(), c.bb()}));
 }
 
 void test6() {
-    std::set<IR::BasicBlock*> allNodes;
+    IR::Function func("test6");
+
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -204,22 +225,30 @@ void test6() {
     g->linkFalse(b.bb());
     h->linkFalse(a.bb());
 
-    testLoops(allNodes, a.bb());
+    auto latch_to_loop = IR::FindAllLoops(func, a.bb());
+    assert(latch_to_loop[b.bb()] == (std::vector<IR::BB*>{g.bb(), f.bb(), c.bb(), d.bb()}));
+    assert(latch_to_loop[a.bb()] == (std::vector<IR::BB*>{h.bb(), g.bb(), f.bb(), c.bb(), b.bb(), d.bb()}));
 }
 
 int main() {
-    std::cout << "Test1\n";
+    std::cout << "Test1 ";
     test1();
-    std::cout << "Test2\n";
+    std::cout << "clear\n";
+    std::cout << "Test2 ";
     test2();
-    std::cout << "Test3\n";
+    std::cout << "clear\n";
+    std::cout << "Test3 ";
     test3();
-    std::cout << "Test4\n";
+    std::cout << "clear\n";
+    std::cout << "Test4 ";
     test4();
-    std::cout << "Test5\n";
+    std::cout << "clear\n";
+    std::cout << "Test5 ";
     test5();
-    std::cout << "Test6\n";
+    std::cout << "clear\n";
+    std::cout << "Test6 ";
     test6();
+    std::cout << "clear\n";
 
     return 0;
 }
