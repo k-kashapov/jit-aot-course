@@ -280,10 +280,10 @@ int main() {
     test3();
     std::cout << "clear\n";
     std::cout << "Test4 ";
-    // test4();
+    test4();
     std::cout << "clear\n";
     std::cout << "Test5 ";
-    // test5();
+    test5();
     std::cout << "clear\n";
     std::cout << "Test6 ";
     test6();
