@@ -75,15 +75,24 @@ ADD_BINARY_OP(XorOp);
 
 #undef ADD_BINARY_OP
 
-class PhiNode : public Op {   // TODO: check recursion on verify
-    std::list<Op *> _sources; // TODO: add operation and bb links
+class PhiNode : public Op {
+    using Source = std::pair<BasicBlock*, Op*>;
+
+    std::list<Source> _sources;
 
   public:
-    PhiNode(std::initializer_list<Op *> ops) : _sources(ops) {}
+    PhiNode(std::initializer_list<Source> srcs) : _sources(srcs) {}
+    PhiNode(std::initializer_list<Op*> ops) {
+        std::for_each(ops.begin(), ops.end(), [&sources = _sources](Op* op){
+            sources.push_back(Source{op->getBB(), op});
+        });
+    }
 
     virtual bool verify() const override {
-        auto verifyOp = [*this](const Op *op) {
-            return op && (op->getType() == this->_type);
+        auto verifyOp = [self = this](const Source &src) {
+            const auto* bb = src.first;
+            const auto* op = src.second;
+            return bb && op && (op->getBB() == bb) && (op->getType() == self->_type);
         };
 
         return std::all_of(_sources.begin(), _sources.end(), verifyOp);
@@ -92,8 +101,8 @@ class PhiNode : public Op {   // TODO: check recursion on verify
     virtual std::ostream &stringify(std::ostream &os) const override {
         auto &stream = os << "PhiNode (";
 
-        auto printSrc = [&stream](const Op *op) -> auto & {
-            return stream << op->getBB()->getName() << "." << op->getId();
+        auto printSrc = [&stream](const std::pair<BasicBlock*, Op*>&  src) -> auto & {
+            return stream << src.first->getName() << "." << src.second->getId();
         };
 
         for (auto src = _sources.begin(); src != std::prev(_sources.end()); src++) {
@@ -125,8 +134,8 @@ class JumpOp : public Op {
     virtual bool verify() const override { return _dest != nullptr; }
 };
 
-class CondBrOp : public Op { // TODO: check successors number and branch to successors
-    Op *_cond = nullptr; // TODO: check that if successors number is consistent with last op in bb
+class CondBrOp : public Op {
+    Op *_cond = nullptr;
     BasicBlock *_dest = nullptr;
 
     virtual std::ostream &stringify(std::ostream &os) const override {
@@ -149,7 +158,8 @@ class CondBrOp : public Op { // TODO: check successors number and branch to succ
     }
 
     virtual bool verify() const override {
-        return _dest != nullptr && _cond != nullptr && _cond->getType() == EType::BOOL;
+        const auto succs = getBB()->getSuccessors();
+        return _dest != nullptr && _cond != nullptr && _cond->getType() == EType::BOOL && succs.first && succs.second;
     }
 };
 

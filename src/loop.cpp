@@ -112,6 +112,4 @@ std::map<BB*, Loop> FindAllLoops(IR::Function& func, IR::BB* start) {
     return loops;
 }
 
-
-
 }; // namespace IR

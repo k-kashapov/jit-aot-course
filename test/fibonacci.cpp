@@ -3,29 +3,29 @@
 #include <types.h>
 
 int main() {
-    auto n = IR::Op::create<IR::ParamOp>(IR::EType::UI32);
-    auto start = IR::Rewriter("start", {n});
+    auto num = IR::Op::create<IR::ParamOp>(IR::EType::UI32);
+    auto start = IR::Rewriter("start", {num});
 
     auto one = start.createOp<IR::ConstOp>(IR::EType::UI32, 1);
-    auto ifeq1 = start.createOp<IR::EqOp>(IR::EType::BOOL, n, one);
+    auto ifeq1 = start.createOp<IR::EqOp>(IR::EType::BOOL, num, one);
 
     auto zero = start.createOp<IR::ConstOp>(IR::EType::UI32, 0);
-    auto ifeq0 = start.createOp<IR::EqOp>(IR::EType::BOOL, n, zero);
+    auto ifeq0 = start.createOp<IR::EqOp>(IR::EType::BOOL, num, zero);
 
     auto zeroOrOne = start.createOp<IR::OrOp>(IR::EType::BOOL, ifeq0, ifeq1);
 
     one = IR::Op::create<IR::ConstOp>(IR::EType::UI32, 1);
-    auto sub1 = IR::Op::create<IR::SubOp>(IR::EType::UI32, n, one);
+    auto sub1 = IR::Op::create<IR::SubOp>(IR::EType::UI32, num, one);
 
     auto call = IR::Op::create<IR::CallOp>(IR::EType::UI32, start.bb(),
-                                           IR::Op::Range{sub1});
+                                           IR::OpRange{sub1});
     auto loopBB = IR::Rewriter("loopBB", {sub1, call});
 
     loopBB->addOp(one);
     start->linkFalse(loopBB.bb());
 
     auto phiN =
-        IR::Op::create<IR::PhiNode>(IR::EType::UI32, IR::Op::Range{n, sub1});
+        IR::Op::create<IR::PhiNode>(IR::EType::UI32, IR::OpRange{num, sub1});
     start->insertOp(one, phiN);
 
     auto ret = IR::Op::create<IR::RetOp>(IR::EType::None, one);

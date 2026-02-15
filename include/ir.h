@@ -36,18 +36,16 @@ static inline void printWithSeparator(std::ostream &os, IteratorT begin, Iterato
 
 class Op {
   protected:
-    int64_t _id = -1;
-    BasicBlock *_bb = nullptr;
-    Type _type = EType::None;
+    int64_t _id;
+    BasicBlock *_bb;
+    Type _type;
 
-    Op() : _type(EType::SI32) {};
-    Op(int64_t id) : _id(id), _type(EType::SI32) {}
+    Op() : _id(-1), _bb(nullptr), _type(EType::SI32) {};
+    Op(int64_t id) : _id(id), _bb(nullptr), _type(EType::SI32) {}
 
     virtual std::ostream &stringify(std::ostream &os) const = 0;
 
   public:
-    using Range = std::initializer_list<Op*>;
-
     template <typename Ty, class... Args>
     requires std::is_base_of_v<Op, Ty>
     static Ty *create(Type ty, Args... args) {
@@ -77,6 +75,8 @@ class Op {
     virtual ~Op() {};
 };
 
+using OpRange = std::initializer_list<Op*>;
+
 class BasicBlock {
     using opPtr = std::unique_ptr<Op>;
 
@@ -84,8 +84,10 @@ class BasicBlock {
     std::vector<BasicBlock *> _preds;
     std::string _name;
     std::list<opPtr> _ops;
-    BasicBlock * _cond_true_succ = nullptr;
-    BasicBlock * _cond_fail_succ = nullptr;
+    struct Successors {
+        BasicBlock* T = nullptr;
+        BasicBlock* F = nullptr;
+    } _cond_succ;
 
     BasicBlock(std::string_view name) : _name(name) {}
     BasicBlock(std::string_view name, std::initializer_list<Op *> ops) : _name(name) {
@@ -95,8 +97,14 @@ class BasicBlock {
     }
 
     void addPred(BasicBlock *bb) { _preds.push_back(bb); }
-    void setSucc(BasicBlock *bb) { _cond_true_succ = bb; }
-    void setCondFailSucc(BasicBlock *bb) { _cond_fail_succ = bb; }
+    void removePred(BasicBlock *bb) {
+        auto iter = std::find(_preds.begin(), _preds.end(), bb);
+        if (iter != _preds.end()) {
+            _preds.erase(iter);
+        }
+    }
+    void setSucc(BasicBlock *bb) { _cond_succ.T = bb; }
+    void setCondFailSucc(BasicBlock *bb) { _cond_succ.F = bb; }
 
   public:
     static BasicBlock *create(std::string_view name) { return new BasicBlock(name); }
@@ -129,18 +137,34 @@ class BasicBlock {
     }
 
     void linkTrue(BasicBlock *bb) {
+        if (!bb) {
+            throw std::runtime_error("Linking to nullptr basic block is not allowed");
+        }
+
+        if (_cond_succ.T != bb) {
+            _cond_succ.T->removePred(this);
+        }
+
         setSucc(bb);
         bb->addPred(this);
     }
 
     void linkFalse(BasicBlock *bb) {
+        if (!bb) {
+            throw std::runtime_error("Linking to nullptr basic block is not allowed");
+        }
+
+        if (_cond_succ.F != bb) {
+            _cond_succ.F->removePred(this);
+        }
+
         setCondFailSucc(bb);
         bb->addPred(this);
     }
 
     const std::string_view getName() const { return _name; }
 
-    const std::pair<BasicBlock *, BasicBlock *> getSuccessors() const { return {_cond_true_succ, _cond_fail_succ}; }
+    const std::pair<BasicBlock *, BasicBlock *> getSuccessors() const { return std::pair(_cond_succ.T, _cond_succ.F); }
 
     const std::vector<BasicBlock *> &getPreds() const { return _preds; }
 
@@ -152,8 +176,8 @@ class BasicBlock {
                            ") ");
 
         os << " (Succs: ";
-        os << (bb._cond_true_succ ? (bb._cond_true_succ->getName()) : "none") << ", ";
-        os << (bb._cond_fail_succ ? (bb._cond_fail_succ->getName()) : "none") << "):\n";
+        os << (bb._cond_succ.T ? (bb._cond_succ.T->getName()) : "none") << ", ";
+        os << (bb._cond_succ.F ? (bb._cond_succ.F->getName()) : "none") << "):\n";
 
         for (auto &op : bb._ops) {
             os << '\t' << *op << '\n';
@@ -171,11 +195,6 @@ class BasicBlock {
         _ops.sort(cmp);
     }
 };
-
-// class Function {
-//     std::list<BasicBlock> bbs;
-//     TODO: implement
-// };
 
 class Rewriter {
     std::unique_ptr<BasicBlock> _bb;

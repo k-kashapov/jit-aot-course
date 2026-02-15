@@ -25,66 +25,6 @@ void printMap(IR::LoopMap loops) {
     }
 }
 
-// auto testLoops(std::set<IR::BB*> allNodes, IR::BB* start) {
-//     for (auto *node : allNodes) {
-//         // std::cout << *node << "\n";
-//     }
-
-//     auto dominators = find_dominators(start, allNodes);
-
-//     auto backs = IR::collect_backedges(start);
-//     for (auto p : backs) {
-//         // std::cout << "backedge: " << p.first->getName() << " -> " << p.second->getName() << "\n";
-//     }
-
-//     auto loops = IR::collect_loops(dominators, backs);
-//     for (auto l : loops) {
-//         std::cout << "loop: header = " << l.first->getName() << "\n\tlatches: "; 
-//         for (auto latch : l.second.innerBBs) {
-//             std::cout << latch->getName() << " ";
-//         }
-//         std::cout << '\n';
-//     }
-
-//     std::vector<IR::BB*> allNodesPostorder;
-//     auto savePO = [&allNodesPostorder](IR::BB* bb){ allNodesPostorder.push_back(bb); };
-//     IR::postorder(start, savePO);
-
-//     std::map<IR::BB*, IR::Loop*> bbToLoopMapping;
-
-//     // std::cout << "postorder: "; 
-//     for (auto node : allNodesPostorder) {
-//         for (auto backedge : backs) {
-//             if (backedge.second == node) {
-//                 // This is a latch
-//                 // std::cout << "This is a latch: " << backedge.first->getName() << " -> " << node->getName() << "\n";
-
-//                 std::vector<IR::BB*> dfsOrder;
-//                 auto saveDFS = [&dfsOrder](IR::BB* bb){ dfsOrder.push_back(bb); };
-//                 IR::reverse_dfs(backedge.first, saveDFS, node);
-
-//                 std::cout << " dfs found: ";
-//                 for (auto bbToAdd : dfsOrder) {
-//                     std::cout << bbToAdd->getName() << "<-";
-
-//                     auto visitedIter = bbToLoopMapping.find(bbToAdd);
-//                     if (visitedIter != bbToLoopMapping.end()) {
-//                         loops[node].innerLoops.insert(visitedIter->second);
-//                     } else {
-//                         loops[node].innerBBs.insert(bbToAdd);
-//                         bbToLoopMapping[bbToAdd] = &loops[node];
-//                     }
-//                 }
-
-//                 std::cout << node->getName() << "\n";
-//                 break;
-//             }
-//         }   
-//     }
-//     // std::cout << '\n';
-//     return loops;
-// }
-
 void test1() {
     IR::Function func("test1");
 
