@@ -1,8 +1,12 @@
 #ifndef OPERATIONS_H
 #define OPERATIONS_H
 
-#include "ir.h"
 #include <algorithm>
+#include <cassert>
+#include <vector>
+
+#include "ir.h"
+#include "utils.h"
 
 namespace IR {
 
@@ -58,8 +62,7 @@ class BinaryOp : public Op {
       public:                                                                                      \
         OP_NAME(Op *lhs, Op *rhs) : BinaryOp(lhs, rhs) {}                                          \
         virtual bool verify() const override {                                                     \
-            return _lhs && _rhs &&                             \
-                   (_lhs->getType() == _rhs->getType());                                           \
+            return _lhs && _rhs && (_lhs->getType() == _rhs->getType());                           \
         }                                                                                          \
     };
 
@@ -76,22 +79,31 @@ ADD_BINARY_OP(XorOp);
 #undef ADD_BINARY_OP
 
 class PhiNode : public Op {
-    using Source = std::pair<BasicBlock*, Op*>;
+    using Source = std::pair<BasicBlock *, Op *>;
 
-    std::list<Source> _sources;
+    std::vector<Source> _sources;
 
   public:
+    PhiNode() {}
     PhiNode(std::initializer_list<Source> srcs) : _sources(srcs) {}
-    PhiNode(std::initializer_list<Op*> ops) {
-        std::for_each(ops.begin(), ops.end(), [&sources = _sources](Op* op){
-            sources.push_back(Source{op->getBB(), op});
-        });
+    PhiNode(IR::OpRange ops) {
+        _sources.reserve(ops.size());
+        for (auto *op : ops) {
+            assert(op->getBB() != nullptr &&
+                   "Operation must have basic block assigned to be added to phi node\n");
+            _sources.push_back(Source{op->getBB(), op});
+        };
     }
+
+    using const_iterator = std::vector<Source>::const_iterator;
+    const_iterator begin() const { return _sources.begin(); }
+    const_iterator end() const { return _sources.end(); }
+    size_t size() const { return _sources.size(); }
 
     virtual bool verify() const override {
         auto verifyOp = [self = this](const Source &src) {
-            const auto* bb = src.first;
-            const auto* op = src.second;
+            const auto *bb = src.first;
+            const auto *op = src.second;
             return bb && op && (op->getBB() == bb) && (op->getType() == self->_type);
         };
 
@@ -101,7 +113,7 @@ class PhiNode : public Op {
     virtual std::ostream &stringify(std::ostream &os) const override {
         auto &stream = os << "PhiNode (";
 
-        auto printSrc = [&stream](const std::pair<BasicBlock*, Op*>&  src) -> auto & {
+        auto printSrc = [&stream](const std::pair<BasicBlock *, Op *> &src) -> auto & {
             return stream << src.first->getName() << "." << src.second->getId();
         };
 
@@ -110,6 +122,11 @@ class PhiNode : public Op {
         }
 
         return printSrc(_sources.back()) << ")";
+    }
+
+    void addSource(BasicBlock *bb, Op *src) {
+        assert(bb != nullptr && src != nullptr);
+        _sources.push_back(Source{bb, src});
     }
 };
 
@@ -140,7 +157,9 @@ class CondBrOp : public Op {
 
     virtual std::ostream &stringify(std::ostream &os) const override {
         os << "Jmp to " << _dest->getName() << " if ";
-        return _cond->printNameAndType(os);
+        _cond->printNameAndType(os);
+        os << " else to " << getBB()->getSuccessors().second->getName();
+        return os;
     }
 
   public:
@@ -159,7 +178,8 @@ class CondBrOp : public Op {
 
     virtual bool verify() const override {
         const auto succs = getBB()->getSuccessors();
-        return _dest != nullptr && _cond != nullptr && _cond->getType() == EType::BOOL && succs.first && succs.second;
+        return _dest != nullptr && _cond != nullptr && _cond->getType() == EType::BOOL &&
+               succs.first && succs.second;
     }
 };
 
@@ -195,12 +215,12 @@ class CallOp : public Op {
             os << ", ";
         }
 
-        return os << "\b\b)";
+        return os << ")";
     }
 
   public:
     CallOp(BasicBlock *dest) : _dest(dest) {}
-    CallOp(BasicBlock *dest, std::initializer_list<Op *> params) : _dest(dest), _params(params) {}
+    CallOp(BasicBlock *dest, IR::OpRange params) : _dest(dest), _params(params) {}
 
     BasicBlock *getDest() const { return _dest; }
 
@@ -211,9 +231,7 @@ class CallOp : public Op {
         _bb->linkTrue(_dest);
     }
 
-    virtual bool verify() const override {
-        return _dest != nullptr;
-    }
+    virtual bool verify() const override { return _dest != nullptr; }
 };
 
 class RetOp : public Op {

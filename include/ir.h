@@ -1,12 +1,14 @@
 #ifndef IR_H
 #define IR_H
 
+#include <concepts>
 #include <iostream>
+#include <iterator>
 #include <list>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
 
 #include <types.h>
 
@@ -16,8 +18,8 @@ class BasicBlock;
 
 template <typename IteratorT, std::invocable<IteratorT> FuncT>
 static inline void printWithSeparator(std::ostream &os, IteratorT begin, IteratorT end, FuncT fn,
-                               std::string_view prefix = "", std::string_view separator = "",
-                               std::string_view suffix = "") {
+                                      std::string_view prefix = "", std::string_view separator = "",
+                                      std::string_view suffix = "") {
     if (begin == end) {
         os << prefix;
         os << suffix;
@@ -47,7 +49,7 @@ class Op {
 
   public:
     template <typename Ty, class... Args>
-    requires std::is_base_of_v<Op, Ty>
+        requires std::is_base_of_v<Op, Ty>
     static Ty *create(Type ty, Args... args) {
         auto res = new Ty(args...);
         res->_type = ty;
@@ -56,7 +58,7 @@ class Op {
 
     virtual bool verify() const = 0;
 
-    std::ostream &printNameAndType(std::ostream &os) const { return os << '$' << _id << _type; }
+    std::ostream &printNameAndType(std::ostream &os) const { return os << '$' <<  << _id << _type; }
 
     friend std::ostream &operator<<(std::ostream &os, const Op &op) {
         op.printNameAndType(os) << " = ";
@@ -68,14 +70,12 @@ class Op {
     BasicBlock *getBB() const { return _bb; }
 
     Type getType() const { return _type; }
-    
+
     void setId(int64_t id) { _id = id; }
     auto getId() const { return _id; }
 
     virtual ~Op() {};
 };
-
-using OpRange = std::initializer_list<Op*>;
 
 class BasicBlock {
     using opPtr = std::unique_ptr<Op>;
@@ -85,8 +85,8 @@ class BasicBlock {
     std::string _name;
     std::list<opPtr> _ops;
     struct Successors {
-        BasicBlock* T = nullptr;
-        BasicBlock* F = nullptr;
+        BasicBlock *T = nullptr;
+        BasicBlock *F = nullptr;
     } _cond_succ;
 
     BasicBlock(std::string_view name) : _name(name) {}
@@ -113,7 +113,7 @@ class BasicBlock {
         return new BasicBlock(name, ops);
     }
 
-    auto insertOp(std::list<opPtr >::const_iterator pos, Op *op) {
+    auto insertOp(std::list<opPtr>::const_iterator pos, Op *op) {
         auto ret = _ops.insert(pos, opPtr(op));
         op->setBB(this);
         op->setId(_ops_free_id++);
@@ -122,12 +122,14 @@ class BasicBlock {
 
     auto insertOp(Op *pos, Op *op) {
         auto iter = _ops.begin();
-        for (; iter != _ops.end(); iter++) {
-            if (iter->get()->getId() == pos->getId()) {
+        for (; iter != _ops.end(); ++iter) {
+            if (iter->get() == pos) {
                 break;
             }
         }
-
+        if (iter == _ops.end()) {
+            throw std::runtime_error("insertOp: pos not found in this basic block");
+        }
         return insertOp(iter, op);
     }
 
@@ -142,11 +144,12 @@ class BasicBlock {
         }
 
         if (_cond_succ.T != bb) {
-            _cond_succ.T->removePred(this);
+            if (_cond_succ.T) {
+                _cond_succ.T->removePred(this);
+            }
+            setSucc(bb);
+            bb->addPred(this);
         }
-
-        setSucc(bb);
-        bb->addPred(this);
     }
 
     void linkFalse(BasicBlock *bb) {
@@ -155,16 +158,19 @@ class BasicBlock {
         }
 
         if (_cond_succ.F != bb) {
-            _cond_succ.F->removePred(this);
+            if (_cond_succ.F) {
+                _cond_succ.F->removePred(this);
+            }
+            setCondFailSucc(bb);
+            bb->addPred(this);
         }
-
-        setCondFailSucc(bb);
-        bb->addPred(this);
     }
 
     const std::string_view getName() const { return _name; }
 
-    const std::pair<BasicBlock *, BasicBlock *> getSuccessors() const { return std::pair(_cond_succ.T, _cond_succ.F); }
+    const std::pair<BasicBlock *, BasicBlock *> getSuccessors() const {
+        return std::pair(_cond_succ.T, _cond_succ.F);
+    }
 
     const std::vector<BasicBlock *> &getPreds() const { return _preds; }
 
@@ -186,75 +192,61 @@ class BasicBlock {
         return os;
     }
 
-    const std::list<opPtr> &getOps() {
-        return _ops;
-    }
+    const std::list<opPtr> &getOps() { return _ops; }
 
     void sort() {
-        auto cmp = [](opPtr& a, opPtr& b) {return a->getId() < b->getId(); };
+        auto cmp = [](opPtr &a, opPtr &b) { return a->getId() < b->getId(); };
         _ops.sort(cmp);
     }
 };
 
 class Rewriter {
     std::unique_ptr<BasicBlock> _bb;
-    std::list<std::unique_ptr<Op> >::const_iterator _insertPoint;
+    std::list<std::unique_ptr<Op>>::const_iterator _insertPoint;
 
-public:
-    Rewriter(std::string_view name, std::initializer_list<IR::Op *> ops) : _bb(BasicBlock::create(name, ops)), _insertPoint(_bb->getOps().end()) { }
+  public:
+    Rewriter(std::string_view name, std::initializer_list<IR::Op *> ops)
+        : _bb(BasicBlock::create(name, ops)), _insertPoint(_bb->getOps().end()) {}
 
     template <typename OpTy, typename... Args>
-    requires requires (Type ty, Args... args) { Op::create<OpTy>(ty, args...); }
+        requires requires(Type ty, Args... args) { Op::create<OpTy>(ty, args...); }
     auto createOp(Type ty, Args... args) {
         auto *op = Op::create<OpTy>(ty, args...);
         _insertPoint = _bb->insertOp(_insertPoint, op);
         return op;
     }
 
-    auto operator->() {
-        return _bb.get();
-    }
+    auto operator->() { return _bb.get(); }
 
-    BasicBlock *bb() {
-        return _bb.get();
-    }
+    BasicBlock *bb() { return _bb.get(); }
 
-    auto &operator*() {
-        return *_bb;
-    }
+    auto &operator*() { return *_bb; }
 
-    friend std::ostream &operator<<(std::ostream &os, const Rewriter& r) {
-        return os << *r._bb;
-    }
+    friend std::ostream &operator<<(std::ostream &os, const Rewriter &r) { return os << *r._bb; }
 };
 
 class Function {
     std::string _name;
-    std::set<BasicBlock*> _bbs;
+    std::set<BasicBlock *> _bbs;
 
-public:
+  public:
     Function(const std::string_view name) : _name(name) {}
-    Function(const std::string_view name, const std::set<BasicBlock*>& basicBlocks) : _name(name), _bbs(basicBlocks) {}
-    Function(const std::string_view name, std::initializer_list<BasicBlock*> basicBlocks) : _name(name), _bbs(basicBlocks) {}
+    Function(const std::string_view name, const std::set<BasicBlock *> &basicBlocks)
+        : _name(name), _bbs(basicBlocks) {}
+    Function(const std::string_view name, std::initializer_list<BasicBlock *> basicBlocks)
+        : _name(name), _bbs(basicBlocks) {}
 
-    const std::string& getName() const {
-        return _name;
-    }
+    const std::string &getName() const { return _name; }
 
-    const std::set<BasicBlock*>& getBBs() const {
-        return _bbs;
-    }
+    const std::set<BasicBlock *> &getBBs() const { return _bbs; }
 
-    void setName(const std::string_view name) {
-        _name = name;
-    }
+    void setName(const std::string_view name) { _name = name; }
 
-    void addBB(BasicBlock* bb) {
-        _bbs.insert(bb);
-    }
+    void addBB(BasicBlock *bb) { _bbs.insert(bb); }
 
-    friend std::ostream &operator<<(std::ostream &os, const Function& f) {
-        for (auto* bb : f._bbs) {
+    friend std::ostream &operator<<(std::ostream &os, const Function &f) {
+        os << "Function " << f._name << "\n";
+        for (auto *bb : f._bbs) {
             os << *bb << "\n";
         }
         return os;
