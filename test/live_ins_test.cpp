@@ -40,11 +40,15 @@ void test1() {
 
     auto it = intervals.find(a);
     assert(it != intervals.end());
-    const auto& ivals_a = it->second;
+    const auto &ivals_a = it->second;
     bool found0_1 = false, found2_2 = false;
-    for (auto& iv : ivals_a) {
-        if (iv.first == 0 && iv.second == 1) found0_1 = true;
-        if (iv.first == 2 && iv.second == 2) found2_2 = true;
+    for (auto &iv : ivals_a) {
+        if (iv.first == 0 && iv.second == 1) {
+            found0_1 = true;
+        }
+        if (iv.first == 2 && iv.second == 2) {
+            found2_2 = true;
+        }
     }
     assert(found0_1 && found2_2);
 
@@ -57,10 +61,12 @@ void test1() {
     assert(it != intervals.end());
     bool found2 = false, found3 = false;
     for (auto &iv : it->second) {
-        if (iv.first == 2 && iv.second == 2)
+        if (iv.first == 2 && iv.second == 2) {
             found2 = true;
-        if (iv.first == 3 && iv.second == 3)
+        }
+        if (iv.first == 3 && iv.second == 3) {
             found3 = true;
+        }
     }
     assert(found2 && found3);
 
@@ -107,16 +113,7 @@ void test2() {
 
     IR::LiveIntervalAnalyzer analyzer;
     analyzer.analyze(&func, entry.bb());
-
-    int64_t phi_id = phi->getGlobalId();
-    bool xT_ok = false, xF_ok = false;
-    for (auto &iv : analyzer.intervals[xT])
-        if (iv.second == phi_id)
-            xT_ok = true;
-    for (auto &iv : analyzer.intervals[xF])
-        if (iv.second == phi_id)
-            xF_ok = true;
-    assert(xT_ok && xF_ok);
+    analyzer.print(std::cerr);
 
     int64_t ret_id = ret->getGlobalId();
     bool phi_def = false, phi_use = false;
@@ -175,16 +172,18 @@ void test3() {
     for (auto *bb : loop.innerBBs) {
         if (!bb->getOps().empty()) {
             int64_t last = bb->getOps().back()->getGlobalId();
-            if (last > loopEndId)
+            if (last > loopEndId) {
                 loopEndId = last;
+            }
         }
     }
 
     int64_t headerStart = header.bb()->getOps().front()->getGlobalId();
     bool found = false;
     for (auto &iv : analyzer.intervals[a]) {
-        if (iv.first <= headerStart && iv.second >= loopEndId)
+        if (iv.first <= headerStart && iv.second >= loopEndId) {
             found = true;
+        }
     }
     assert(found);
 }

@@ -53,16 +53,16 @@ dominatorMap find_dominators(BB *start, bbSet allNodes) {
     return dominators;
 }
 
-std::map<BB*, BB*> find_immediate_dominators(BB* start, dominatorMap dmap) {
-    std::map<BB*, int64_t> enumeration;
+std::map<BB *, BB *> find_immediate_dominators(BB *start, dominatorMap dmap) {
+    std::map<BB *, int64_t> enumeration;
     int64_t idx = 0;
-    auto collect_idx = [&enumeration, &idx](BB* bb){ enumeration.insert(std::pair{bb, idx++}); };
+    auto collect_idx = [&enumeration, &idx](BB *bb) { enumeration.insert(std::pair{bb, idx++}); };
     auto order = bfs(start, collect_idx);
 
-    std::map<BB*, BB*> res = {};
+    std::map<BB *, BB *> res = {};
     for (const auto &[bb, doms] : dmap) {
         int64_t max_dom_idx = -1;
-        BB* immdom = nullptr;
+        BB *immdom = nullptr;
         for (const auto dom : doms) {
             int64_t enum_idx = enumeration[dom];
             if (enum_idx > max_dom_idx) {
@@ -77,4 +77,4 @@ std::map<BB*, BB*> find_immediate_dominators(BB* start, dominatorMap dmap) {
     return res;
 }
 
-};
+}; // namespace IR

@@ -46,7 +46,7 @@ class BinaryOp : public Op {
   public:
     BinaryOp(Op *lhs, Op *rhs) : _lhs(lhs), _rhs(rhs) {}
 
-    std::vector<Op*> getOperands() const override { return {_lhs, _rhs}; }
+    std::vector<Op *> getOperands() const override { return {_lhs, _rhs}; }
 
     Op *getLhs() const { return _lhs; }
 
@@ -95,10 +95,10 @@ class PhiNode : public Op {
         };
     }
 
-    std::vector<Op*> getOperands() const override {
-        std::vector<Op*> res;
+    std::vector<Op *> getOperands() const override {
+        std::vector<Op *> res;
         res.reserve(_sources.size());
-        for (const auto &source: _sources) {
+        for (const auto &source : _sources) {
             res.push_back(source.second);
         }
         return res;
@@ -119,9 +119,10 @@ class PhiNode : public Op {
         return std::all_of(_sources.begin(), _sources.end(), verifyOp);
     }
 
-    Op* getInputForPredecessor(BasicBlock* pred) const {
-        for (auto& src : _sources)
-            if (src.first == pred) return src.second;
+    Op *getInputForPredecessor(BasicBlock *pred) const {
+        for (auto &src : _sources)
+            if (src.first == pred)
+                return src.second;
         return nullptr;
     }
 
@@ -129,7 +130,7 @@ class PhiNode : public Op {
         auto &stream = os << "PhiNode (";
 
         auto printSrc = [&stream](const std::pair<BasicBlock *, Op *> &src) -> auto & {
-            return stream << src.first->getName() << "." << src.second->getBlockId();
+            return stream << src.first->getName() << "." << src.second->getGlobalId();
         };
 
         for (auto src = _sources.begin(); src != std::prev(_sources.end()); src++) {
@@ -186,9 +187,7 @@ class CondBrOp : public Op {
     Op *getCond() const { return _cond; }
     void setCond(Op *cond) { _cond = cond; }
 
-    std::vector<Op*> getOperands() const override {
-        return { _cond };
-    }
+    std::vector<Op *> getOperands() const override { return {_cond}; }
 
     virtual void setBB(BasicBlock *bb) override {
         _bb = bb;
@@ -241,9 +240,7 @@ class CallOp : public Op {
     CallOp(BasicBlock *dest) : _dest(dest) {}
     CallOp(BasicBlock *dest, IR::OpRange params) : _dest(dest), _params(params) {}
 
-    std::vector<Op*> getOperands() const override {
-        return { _params.begin(), _params.end() };
-    }
+    std::vector<Op *> getOperands() const override { return {_params.begin(), _params.end()}; }
 
     BasicBlock *getDest() const { return _dest; }
 
@@ -268,9 +265,7 @@ class RetOp : public Op {
   public:
     RetOp(Op *val) : _val(val) {}
 
-    std::vector<Op*> getOperands() const override {
-        return {_val};
-    }
+    std::vector<Op *> getOperands() const override { return {_val}; }
 
     Op *getValue() const { return _val; }
     void setValue(Op *val) { _val = val; }

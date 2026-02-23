@@ -2,7 +2,7 @@
 
 namespace IR {
 
-void do_collect(BB* bb, bbSet& visited, bbSet& gray, std::map<BB*, BB*> &backedges) {
+void do_collect(BB *bb, bbSet &visited, bbSet &gray, std::map<BB *, BB *> &backedges) {
     gray.insert(bb);
     visited.insert(bb);
 
@@ -30,21 +30,21 @@ void do_collect(BB* bb, bbSet& visited, bbSet& gray, std::map<BB*, BB*> &backedg
     gray.erase(bb);
 }
 
-std::map<BB*, BB*> collect_backedges(BB* start) {
+std::map<BB *, BB *> collect_backedges(BB *start) {
     bbSet gray;
     bbSet visited;
-    std::map<BB*, BB*> backedges;
+    std::map<BB *, BB *> backedges;
     do_collect(start, visited, gray, backedges);
 
     return backedges;
 }
 
-LoopMap collect_loops(dominatorMap dmap, std::map<BB*, BB*> backedges) {
+LoopMap collect_loops(dominatorMap dmap, std::map<BB *, BB *> backedges) {
     LoopMap loops;
 
     for (auto &b : backedges) {
-        BB* header = b.first;
-        BB* latch = b.second;
+        BB *header = b.first;
+        BB *latch = b.second;
 
         // std::cout << "backedge = " << latch->getName() << "->" << header->getName() << "\n";
 
@@ -63,20 +63,20 @@ LoopMap collect_loops(dominatorMap dmap, std::map<BB*, BB*> backedges) {
     return loops;
 }
 
-std::map<BB*, Loop> FindAllLoops(IR::Function& func, IR::BB* start) {
+std::map<BB *, Loop> FindAllLoops(IR::Function &func, IR::BB *start) {
     auto allNodes = func.getBBs();
     auto dominators = find_dominators(start, allNodes);
 
     auto backs = IR::collect_backedges(start);
     auto loops = IR::collect_loops(dominators, backs);
 
-    std::vector<IR::BB*> allNodesPostorder;
-    auto savePO = [&allNodesPostorder](IR::BB* bb){ allNodesPostorder.push_back(bb); };
+    std::vector<IR::BB *> allNodesPostorder;
+    auto savePO = [&allNodesPostorder](IR::BB *bb) { allNodesPostorder.push_back(bb); };
     IR::postorder(start, savePO);
 
-    std::map<IR::BB*, IR::Loop*> bbToLoopMapping;
+    std::map<IR::BB *, IR::Loop *> bbToLoopMapping;
 
-    // std::cout << "postorder:\n"; 
+    // std::cout << "postorder:\n";
     for (auto node : allNodesPostorder) {
         if (loops.find(node) != loops.end()) {
             auto backedgeIter = backs.find(node);
@@ -85,8 +85,8 @@ std::map<BB*, Loop> FindAllLoops(IR::Function& func, IR::BB* start) {
             // std::cout << "\theader = " << header->getName() << "\n";
             // std::cout << "\tlatch = " << latch->getName() << "\n";
 
-            std::vector<IR::BB*> dfsOrder;
-            auto saveDFS = [&dfsOrder](IR::BB* bb){ dfsOrder.push_back(bb); };
+            std::vector<IR::BB *> dfsOrder;
+            auto saveDFS = [&dfsOrder](IR::BB *bb) { dfsOrder.push_back(bb); };
             IR::reverse_dfs(latch, saveDFS, header);
 
             // std::cout << " dfs found: ";

@@ -1,11 +1,13 @@
 #include <cassert>
 #include <domination.h>
 
-#define MAKE_BB(NAME) auto NAME = IR::Rewriter(id++, #NAME, {}); allNodes.insert(NAME.bb())
+#define MAKE_BB(NAME)                                                                              \
+    auto NAME = IR::Rewriter(id++, #NAME, {});                                                     \
+    allNodes.insert(NAME.bb())
 
 void test1() {
     int64_t id = 0;
-    std::set<IR::BasicBlock*> allNodes;
+    std::set<IR::BasicBlock *> allNodes;
 
     MAKE_BB(a);
     MAKE_BB(b);
@@ -60,7 +62,7 @@ void test1() {
 
 void test2() {
     int64_t id = 0;
-    std::set<IR::BasicBlock*> allNodes;
+    std::set<IR::BasicBlock *> allNodes;
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -133,7 +135,7 @@ void test2() {
 
 void test3() {
     int64_t id = 0;
-    std::set<IR::BasicBlock*> allNodes;
+    std::set<IR::BasicBlock *> allNodes;
     MAKE_BB(a);
     MAKE_BB(b);
     MAKE_BB(c);
@@ -149,14 +151,14 @@ void test3() {
     c->linkTrue(d.bb());
     d->linkTrue(g.bb());
     g->linkTrue(i.bb());
-    
+
     g->linkFalse(c.bb());
 
     b->linkFalse(e.bb());
     e->linkTrue(f.bb());
     f->linkTrue(h.bb());
     h->linkTrue(i.bb());
-    
+
     e->linkFalse(d.bb());
 
     h->linkFalse(g.bb());

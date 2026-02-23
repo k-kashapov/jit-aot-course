@@ -85,12 +85,9 @@ class Op {
     void setGlobalId(int64_t id) { _globalId = id; }
     int64_t getGlobalId() const { return _globalId; }
 
-    virtual std::vector<Op*> getOperands() const { 
-        return {};
-    }
+    virtual std::vector<Op *> getOperands() const { return {}; }
 
-    template <typename ConcreteOp>
-    bool is() { return dynamic_cast<ConcreteOp*>(this) != nullptr; }
+    template <typename ConcreteOp> bool is() { return dynamic_cast<ConcreteOp *>(this) != nullptr; }
 
     virtual ~Op() {};
 };
@@ -133,10 +130,12 @@ class BasicBlock {
     void setCondFailSucc(BasicBlock *bb) { _cond_succ.F = bb; }
 
     // live at entry of this block
-    std::set<Op*> liveIn;
+    std::set<Op *> liveIn;
 
   public:
-    static BasicBlock *create(int64_t id, std::string_view name) { return new BasicBlock(id, name); }
+    static BasicBlock *create(int64_t id, std::string_view name) {
+        return new BasicBlock(id, name);
+    }
 
     static BasicBlock *create(int64_t id, std::string_view name, std::initializer_list<Op *> ops) {
         return new BasicBlock(id, name, ops);
@@ -237,7 +236,7 @@ class BasicBlock {
         _ops.sort(cmp);
     }
 
-    std::set<Op*>& getLiveIn() { return liveIn; }
+    std::set<Op *> &getLiveIn() { return liveIn; }
 };
 
 class Rewriter {
@@ -277,15 +276,15 @@ void postorder(BasicBlock *bb, std::function<void(BasicBlock *)> fn);
 
 class Function {
     std::string _name;
-    std::set<BasicBlock*> _bbs;
-    BasicBlock* _entry = nullptr;
+    std::set<BasicBlock *> _bbs;
+    BasicBlock *_entry = nullptr;
 
   public:
     Function(const std::string_view name) : _name(name) {}
 
     const std::string &getName() const { return _name; }
 
-    const std::set<BasicBlock*> &getBBs() const { return _bbs; }
+    const std::set<BasicBlock *> &getBBs() const { return _bbs; }
 
     void setName(const std::string_view name) { _name = name; }
 
@@ -295,10 +294,8 @@ class Function {
         os << "Function " << f._name << "\n";
 
         if (f._entry) {
-            std::vector<BasicBlock*> rpo;
-            auto savePO = [&rpo](BasicBlock* bb){ 
-                rpo.push_back(bb);
-            };
+            std::vector<BasicBlock *> rpo;
+            auto savePO = [&rpo](BasicBlock *bb) { rpo.push_back(bb); };
             postorder(f._entry, savePO);
 
             std::reverse(rpo.begin(), rpo.end()); // now reverse postorder
@@ -314,18 +311,16 @@ class Function {
         return os;
     }
 
-    void assignGlobalIds(BasicBlock* entry) {
+    void assignGlobalIds(BasicBlock *entry) {
         _entry = entry;
-        std::vector<BasicBlock*> rpo;
-        auto savePO = [&rpo](BasicBlock* bb){ 
-            rpo.push_back(bb);
-        };
+        std::vector<BasicBlock *> rpo;
+        auto savePO = [&rpo](BasicBlock *bb) { rpo.push_back(bb); };
         postorder(entry, savePO);
 
         std::reverse(rpo.begin(), rpo.end()); // now reverse postorder
 
         int64_t nextId = 0;
-        for (auto* bb : rpo) {
+        for (auto *bb : rpo) {
 
             for (auto &opPtr : bb->getOps()) {
                 // std::cerr << *opPtr << "\n";
@@ -336,7 +331,7 @@ class Function {
 
     // FIXME: this is bullshit
     ~Function() {
-        for (auto *bb: _bbs) {
+        for (auto *bb : _bbs) {
             delete bb;
         }
     }
