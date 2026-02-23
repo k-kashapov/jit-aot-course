@@ -252,7 +252,15 @@ class Rewriter {
         requires requires(Type ty, Args... args) { Op::create<OpTy>(ty, args...); }
     auto createOp(Type ty, Args... args) {
         auto *op = Op::create<OpTy>(ty, args...);
-        _insertPoint = _bb->insertOp(_insertPoint, op);
+        _insertPoint = _bb->addOp(op);
+        return op;
+    }
+
+    template <typename OpTy, typename... Args>
+        requires requires(Type ty, Args... args) { Op::create<OpTy>(ty, args...); }
+    auto createOp(std::list<std::unique_ptr<Op>>::const_iterator at, Type ty, Args... args) {
+        auto *op = Op::create<OpTy>(ty, args...);
+        _bb->insertOp(at, op);
         return op;
     }
 
@@ -270,6 +278,7 @@ void postorder(BasicBlock *bb, std::function<void(BasicBlock *)> fn);
 class Function {
     std::string _name;
     std::set<BasicBlock*> _bbs;
+    BasicBlock* _entry = nullptr;
 
   public:
     Function(const std::string_view name) : _name(name) {}
@@ -284,15 +293,29 @@ class Function {
 
     friend std::ostream &operator<<(std::ostream &os, const Function &f) {
         os << "Function " << f._name << "\n";
-        for (auto *bb : f._bbs) {
-            os << *bb << "\n";
+
+        if (f._entry) {
+            std::vector<BasicBlock*> rpo;
+            auto savePO = [&rpo](BasicBlock* bb){ 
+                rpo.push_back(bb);
+            };
+            postorder(f._entry, savePO);
+
+            std::reverse(rpo.begin(), rpo.end()); // now reverse postorder
+            for (auto *bb : rpo) {
+                os << *bb << "\n";
+            }
+        } else {
+            for (auto *bb : f._bbs) {
+                os << *bb << "\n";
+            }
         }
+
         return os;
     }
 
     void assignGlobalIds(BasicBlock* entry) {
-        std::unordered_set<BasicBlock*> visited;
-
+        _entry = entry;
         std::vector<BasicBlock*> rpo;
         auto savePO = [&rpo](BasicBlock* bb){ 
             rpo.push_back(bb);

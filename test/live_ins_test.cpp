@@ -4,12 +4,12 @@
 #include <vector>
 
 #include "ir.h"
-#include "operations.h"
-#include "loop.h"
 #include "liveInterval.h"
+#include "loop.h"
+#include "operations.h"
 
-#define MAKE_BB(NAME)                                      \
-    auto NAME = IR::Rewriter(id++, #NAME, {});             \
+#define MAKE_BB(NAME)                                                                              \
+    auto NAME = IR::Rewriter(id++, #NAME, {});                                                     \
     func.addBB(NAME.bb())
 
 void test1() {
@@ -23,17 +23,20 @@ void test1() {
     entry.bb()->linkTrue(block.bb());
     block.bb()->linkTrue(exit.bb());
 
-    auto* a   = entry.createOp<IR::ConstOp>(IR::EType::SI32, 42);
-    auto* b   = entry.createOp<IR::ConstOp>(IR::EType::SI32, 100);
-    auto* use = block.createOp<IR::AddOp>(IR::EType::SI32, a, a);
-    auto* ret = exit.createOp<IR::RetOp>(IR::EType::None, use);
+    auto *a = entry.createOp<IR::ConstOp>(IR::EType::SI32, 42);
+    // b is dead code
+    auto *b = entry.createOp<IR::ConstOp>(IR::EType::SI32, 100);
+    auto *use = block.createOp<IR::AddOp>(IR::EType::SI32, a, a);
+    auto *ret = exit.createOp<IR::RetOp>(IR::EType::None, use);
 
-    // func.assignGlobalIds(entry.bb());
+    func.assignGlobalIds(entry.bb());
+
+    std::cerr << func << "\n";
 
     IR::LiveIntervalAnalyzer analyzer;
     analyzer.analyze(&func, entry.bb());
 
-    auto& intervals = analyzer.intervals;
+    auto &intervals = analyzer.intervals;
 
     auto it = intervals.find(a);
     assert(it != intervals.end());
@@ -53,9 +56,11 @@ void test1() {
     it = intervals.find(use);
     assert(it != intervals.end());
     bool found2 = false, found3 = false;
-    for (auto& iv : it->second) {
-        if (iv.first == 2 && iv.second == 2) found2 = true;
-        if (iv.first == 3 && iv.second == 3) found3 = true;
+    for (auto &iv : it->second) {
+        if (iv.first == 2 && iv.second == 2)
+            found2 = true;
+        if (iv.first == 3 && iv.second == 3)
+            found3 = true;
     }
     assert(found2 && found3);
 
@@ -81,40 +86,45 @@ void test2() {
     ifF.bb()->linkTrue(merge.bb());
     merge.bb()->linkTrue(exit.bb());
 
-    auto* cond = entry.createOp<IR::ConstOp>(IR::EType::BOOL, 1);
-    auto* br   = entry.createOp<IR::CondBrOp>(IR::EType::None, cond, ifT.bb());
+    auto *cond = entry.createOp<IR::ConstOp>(IR::EType::BOOL, 1);
+    entry.createOp<IR::CondBrOp>(IR::EType::None, cond, ifT.bb());
     entry.bb()->linkFalse(ifF.bb());
 
-    auto* xT   = ifT.createOp<IR::ConstOp>(IR::EType::SI32, 10);
-    auto* jmpT = ifT.createOp<IR::JumpOp>(IR::EType::None, merge.bb());
+    auto *xT = ifT.createOp<IR::ConstOp>(IR::EType::SI32, 10);
+    ifT.createOp<IR::JumpOp>(IR::EType::None, merge.bb());
 
-    auto* xF   = ifF.createOp<IR::ConstOp>(IR::EType::SI32, 20);
-    auto* jmpF = ifF.createOp<IR::JumpOp>(IR::EType::None, merge.bb());
+    auto *xF = ifF.createOp<IR::ConstOp>(IR::EType::SI32, 20);
+    ifF.createOp<IR::JumpOp>(IR::EType::None, merge.bb());
 
-    auto* phi = merge.createOp<IR::PhiNode>(IR::EType::SI32);
+    auto *phi = merge.createOp<IR::PhiNode>(IR::EType::SI32);
     phi->addSource(ifT.bb(), xT);
     phi->addSource(ifF.bb(), xF);
 
-    auto* ret = exit.createOp<IR::RetOp>(IR::EType::None, phi);
+    auto *ret = exit.createOp<IR::RetOp>(IR::EType::None, phi);
 
     func.assignGlobalIds(entry.bb());
+    std::cerr << func << "\n";
 
     IR::LiveIntervalAnalyzer analyzer;
     analyzer.analyze(&func, entry.bb());
 
     int64_t phi_id = phi->getGlobalId();
     bool xT_ok = false, xF_ok = false;
-    for (auto& iv : analyzer.intervals[xT])
-        if (iv.second == phi_id) xT_ok = true;
-    for (auto& iv : analyzer.intervals[xF])
-        if (iv.second == phi_id) xF_ok = true;
+    for (auto &iv : analyzer.intervals[xT])
+        if (iv.second == phi_id)
+            xT_ok = true;
+    for (auto &iv : analyzer.intervals[xF])
+        if (iv.second == phi_id)
+            xF_ok = true;
     assert(xT_ok && xF_ok);
 
     int64_t ret_id = ret->getGlobalId();
     bool phi_def = false, phi_use = false;
-    for (auto& iv : analyzer.intervals[phi]) {
-        if (iv.first == phi_id && iv.second == phi_id) phi_def = true;
-        if (iv.first == ret_id && iv.second == ret_id) phi_use = true;
+    for (auto &iv : analyzer.intervals[phi]) {
+        if (iv.first == phi_id && iv.second == phi_id)
+            phi_def = true;
+        if (iv.first == ret_id && iv.second == ret_id)
+            phi_use = true;
     }
     assert(phi_def && phi_use);
 }
@@ -133,24 +143,25 @@ void test3() {
     header.bb()->linkFalse(exit.bb());
     body.bb()->linkTrue(header.bb());
 
-    auto* a    = entry.createOp<IR::ConstOp>(IR::EType::SI32, 0);
-    auto* ten  = entry.createOp<IR::ConstOp>(IR::EType::SI32, 10);
-    auto* jmpE = entry.createOp<IR::JumpOp>(IR::EType::None, header.bb());
+    auto *a = entry.createOp<IR::ConstOp>(IR::EType::SI32, 0);
+    auto *ten = entry.createOp<IR::ConstOp>(IR::EType::SI32, 10);
+    entry.createOp<IR::JumpOp>(IR::EType::None, header.bb());
 
-    auto* i_phi = header.createOp<IR::PhiNode>(IR::EType::SI32);
+    auto *i_phi = header.createOp<IR::PhiNode>(IR::EType::SI32);
     i_phi->addSource(entry.bb(), a);
-    auto* cmp = header.createOp<IR::GreaterOp>(IR::EType::BOOL, i_phi, ten);
-    auto* br  = header.createOp<IR::CondBrOp>(IR::EType::None, cmp, exit.bb());
+    auto *cmp = header.createOp<IR::GreaterOp>(IR::EType::BOOL, i_phi, ten);
+    header.createOp<IR::CondBrOp>(IR::EType::None, cmp, exit.bb());
     header.bb()->linkFalse(body.bb());
 
-    auto* i_next = body.createOp<IR::AddOp>(IR::EType::SI32, i_phi, a);
-    auto* jmpB   = body.createOp<IR::JumpOp>(IR::EType::None, header.bb());
+    auto *i_next = body.createOp<IR::AddOp>(IR::EType::SI32, i_phi, a);
+    body.createOp<IR::JumpOp>(IR::EType::None, header.bb());
 
     i_phi->addSource(body.bb(), i_next);
 
-    auto* ret = exit.createOp<IR::RetOp>(IR::EType::None, i_phi);
+    exit.createOp<IR::RetOp>(IR::EType::None, i_phi);
 
     func.assignGlobalIds(entry.bb());
+    std::cerr << func << "\n";
 
     IR::LiveIntervalAnalyzer analyzer;
     analyzer.analyze(&func, entry.bb());
@@ -159,18 +170,19 @@ void test3() {
     assert(loopMap.size() == 1);
     assert(loopMap.count(header.bb()));
 
-    const auto& loop = loopMap[header.bb()];
+    const auto &loop = loopMap[header.bb()];
     int64_t loopEndId = header.bb()->getOps().back()->getGlobalId();
-    for (auto* bb : loop.innerBBs) {
+    for (auto *bb : loop.innerBBs) {
         if (!bb->getOps().empty()) {
             int64_t last = bb->getOps().back()->getGlobalId();
-            if (last > loopEndId) loopEndId = last;
+            if (last > loopEndId)
+                loopEndId = last;
         }
     }
 
     int64_t headerStart = header.bb()->getOps().front()->getGlobalId();
     bool found = false;
-    for (auto& iv : analyzer.intervals[a]) {
+    for (auto &iv : analyzer.intervals[a]) {
         if (iv.first <= headerStart && iv.second >= loopEndId)
             found = true;
     }
@@ -178,9 +190,15 @@ void test3() {
 }
 
 int main() {
-    std::cout << "Test1 "; test1(); std::cout << "clear\n";
-    std::cout << "Test2 "; test2(); std::cout << "clear\n";
-    std::cout << "Test3 "; test3(); std::cout << "clear\n";
+    std::cout << "Test1 ";
+    test1();
+    std::cout << "clear\n";
+    std::cout << "Test2 ";
+    test2();
+    std::cout << "clear\n";
+    std::cout << "Test3 ";
+    test3();
+    std::cout << "clear\n";
     std::cout << "All tests passed.\n";
     return 0;
 }

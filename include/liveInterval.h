@@ -1,7 +1,8 @@
 #include <algorithm>
+#include <functional>
+#include <iostream>
 #include <unordered_map>
 #include <unordered_set>
-#include <functional>
 
 #include "loop.h"
 #include "operations.h"
@@ -9,59 +10,49 @@
 namespace IR {
 
 class LiveIntervalAnalyzer {
-public:
-    using Interval = std::pair<int64_t, int64_t>; // [start, end]
-    std::unordered_map<Op*, std::vector<Interval>> intervals;
+  public:
+    using Interval = std::pair<int64_t, int64_t>;
+    std::unordered_map<Op *, std::vector<Interval>> intervals;
 
-    void analyze(Function* func, BasicBlock* entry) {
-        // Assign global IDs in reverse postorder
+    void analyze(Function *func, BasicBlock *entry) {
         func->assignGlobalIds(entry);
 
-        // Compute reverse postorder again for processing (could reuse but we need order vector)
-        std::vector<BasicBlock*> order;
-        std::cerr << "postorder:\n";
-        auto savePO = [&order](BasicBlock* bb){ 
-            std::cerr << '\t' << bb->getName() << "\n";
-            order.push_back(bb);
-        };
-
+        std::vector<BasicBlock *> order;
+        auto savePO = [&order](BasicBlock *bb) { order.push_back(bb); };
         postorder(entry, savePO);
 
-        // Get loop information using existing detection
         auto loopMap = IR::FindAllLoops(*func, entry);
 
-        // Helper to get first/last global ID of a block
-        auto blockStart = [](BasicBlock* bb) -> int64_t {
-            if (bb->getOps().empty()) return -1;
+        auto blockStart = [](BasicBlock *bb) -> int64_t {
+            if (bb->getOps().empty())
+                return -1;
             return bb->getOps().front()->getGlobalId();
         };
-
-        auto blockEnd = [](BasicBlock* bb) -> int64_t {
-            if (bb->getOps().empty()) return -1;
+        auto blockEnd = [](BasicBlock *bb) -> int64_t {
+            if (bb->getOps().empty())
+                return -1;
             return bb->getOps().back()->getGlobalId();
         };
 
-        // Process blocks in reverse order (exit → entry)
         for (auto it = order.begin(); it != order.end(); ++it) {
-            BasicBlock* b = *it;
+            BasicBlock *b = *it;
 
-            // live = union of successors' liveIn
-            std::set<Op*> live;
+            std::set<Op *> live;
             auto succs = b->getSuccessors();
-            for (auto* succ : {succs.first, succs.second}) {
+            for (auto *succ : {succs.first, succs.second}) {
                 if (succ) {
                     live.insert(succ->getLiveIn().begin(), succ->getLiveIn().end());
                 }
             }
 
-            // Add phi inputs from successors
-            for (auto* succ : {succs.first, succs.second}) {
-                if (!succ) continue;
-                for (auto& opPtr : succ->getOps()) {
-                    Op* op = opPtr.get();
+            for (auto *succ : {succs.first, succs.second}) {
+                if (!succ)
+                    continue;
+                for (auto &opPtr : succ->getOps()) {
+                    Op *op = opPtr.get();
                     if (op->is<PhiNode>()) {
-                        PhiNode* phi = static_cast<PhiNode*>(op);
-                        Op* input = phi->getInputForPredecessor(b);
+                        PhiNode *phi = static_cast<PhiNode *>(op);
+                        Op *input = phi->getInputForPredecessor(b);
                         if (input) {
                             live.insert(input);
                         }
@@ -70,83 +61,79 @@ public:
             }
 
             int64_t b_from = blockStart(b);
-            int64_t b_to   = blockEnd(b);
-            if (b_from == -1) {
-                continue; // empty block (should not happen)
-            }
+            int64_t b_to = blockEnd(b);
+            if (b_from == -1)
+                continue;
 
-            // Extend intervals for currently live variables across whole block
-            for (Op* opd : live) {
+            for (Op *opd : live) {
                 intervals[opd].emplace_back(b_from, b_to);
             }
 
-            // Process operations in reverse order (within block)
-            auto& ops = b->getOps();
+            auto &ops = b->getOps();
             for (auto rit = ops.rbegin(); rit != ops.rend(); ++rit) {
-                Op* op = rit->get();
+                Op *op = rit->get();
+                if (op->is<PhiNode>())
+                    continue;
+
                 int64_t opId = op->getGlobalId();
 
-                // Output operand (the op itself)
-                if (intervals[op].empty()) {
-                    intervals[op].emplace_back(opId, opId);
-                } else {
-                    for (auto &range : intervals[op]) {
-                        range.first = opId;
+                for (Op *input : op->getOperands()) {
+                    if (!input)
+                        continue;
+                    if (live.find(input) == live.end()) {
+                        intervals[input].emplace_back(b_from, opId);
                     }
-                }
-
-                live.erase(op);
-
-                // Input operands
-                for (Op* input : op->getOperands()) {
-                    if (!input) continue;
-                    intervals[input].emplace_back(b_from, opId);
                     live.insert(input);
                 }
+
+                auto &vec = intervals[op];
+                bool found = false;
+                for (auto &range : vec) {
+                    if (range.first == b_from) {
+                        range.first = opId;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    vec.emplace_back(opId, opId);
+                }
+                live.erase(op);
             }
 
-            // Remove phi outputs of this block
-            for (auto& opPtr : ops) {
-                Op* op = opPtr.get();
+            for (auto &opPtr : ops) {
+                Op *op = opPtr.get();
                 if (op->is<PhiNode>()) {
                     live.erase(op);
                 }
             }
 
-            // If this block is a loop header, extend live variables across the entire loop
             if (loopMap.count(b)) {
-                const auto& loop = loopMap[b];
-                // Gather all blocks in the loop (header + innerBBs)
-                std::vector<BasicBlock*> loopBlocks = {b};
+                const auto &loop = loopMap[b];
+                std::vector<BasicBlock *> loopBlocks = {b};
                 loopBlocks.insert(loopBlocks.end(), loop.innerBBs.begin(), loop.innerBBs.end());
 
-                // Find the block with the maximum global end ID
-                BasicBlock* loopEndBlock = b;
                 int64_t maxEnd = b_to;
-                for (auto* lb : loopBlocks) {
+                for (auto *lb : loopBlocks) {
                     int64_t end = blockEnd(lb);
-                    if (end > maxEnd) {
+                    if (end > maxEnd)
                         maxEnd = end;
-                        loopEndBlock = lb;
-                    }
                 }
 
-                // Extend live variables to the last instruction of the loop
-                for (Op* opd : live) {
+                for (Op *opd : live) {
                     intervals[opd].emplace_back(b_from, maxEnd);
                 }
             }
 
-            // Save liveIn for this block
             b->getLiveIn() = live;
         }
     }
 
-    void print(std::ostream& os) const {
-        for (auto& [op, vec] : intervals) {
-            os << "Op $" << op->getBlockId() << " (global " << op->getGlobalId()
-               << ", type " << op->getType() << "): ";
-            for (auto& [start, end] : vec) {
+    void print(std::ostream &os) const {
+        for (auto &[op, vec] : intervals) {
+            os << "Op $" << op->getBlockId() << " (global " << op->getGlobalId() << ", type "
+               << op->getType() << "): ";
+            for (auto &[start, end] : vec) {
                 os << "[" << start << ", " << end << "] ";
             }
             os << "\n";
