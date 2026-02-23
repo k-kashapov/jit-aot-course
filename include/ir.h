@@ -1,13 +1,17 @@
 #ifndef IR_H
 #define IR_H
 
+#include <algorithm>
 #include <concepts>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <list>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include <types.h>
@@ -38,12 +42,17 @@ static inline void printWithSeparator(std::ostream &os, IteratorT begin, Iterato
 
 class Op {
   protected:
-    int64_t _id;
+    // function-wide ID
+    int64_t _globalId = -1;
+
+    // id inside basic block
+    int64_t _blockId;
+
     BasicBlock *_bb;
     Type _type;
 
-    Op() : _id(-1), _bb(nullptr), _type(EType::SI32) {};
-    Op(int64_t id) : _id(id), _bb(nullptr), _type(EType::SI32) {}
+    Op() : _blockId(-1), _bb(nullptr), _type(EType::SI32) {};
+    Op(int64_t id) : _blockId(id), _bb(nullptr), _type(EType::SI32) {}
 
     virtual std::ostream &stringify(std::ostream &os) const = 0;
 
@@ -58,7 +67,7 @@ class Op {
 
     virtual bool verify() const = 0;
 
-    std::ostream &printNameAndType(std::ostream &os) const { return os << '$' <<  << _id << _type; }
+    std::ostream &printNameAndType(std::ostream &os) const;
 
     friend std::ostream &operator<<(std::ostream &os, const Op &op) {
         op.printNameAndType(os) << " = ";
@@ -71,8 +80,10 @@ class Op {
 
     Type getType() const { return _type; }
 
-    void setId(int64_t id) { _id = id; }
-    auto getId() const { return _id; }
+    void setBlockId(int64_t id) { _blockId = id; }
+    auto getBlockId() const { return _blockId; }
+    void setGlobalId(int64_t id) { _globalId = id; }
+    int64_t getGlobalId() const { return _globalId; }
 
     virtual ~Op() {};
 };
@@ -80,20 +91,27 @@ class Op {
 class BasicBlock {
     using opPtr = std::unique_ptr<Op>;
 
+    int64_t _id;
+
     int64_t _ops_free_id = 0;
     std::vector<BasicBlock *> _preds;
-    std::string _name;
+    std::optional<std::string> _name;
     std::list<opPtr> _ops;
     struct Successors {
         BasicBlock *T = nullptr;
         BasicBlock *F = nullptr;
     } _cond_succ;
 
-    BasicBlock(std::string_view name) : _name(name) {}
-    BasicBlock(std::string_view name, std::initializer_list<Op *> ops) : _name(name) {
+    BasicBlock(int64_t id) : _id(id) {}
+    BasicBlock(int64_t id, std::initializer_list<Op *> ops) : _id(id) {
         for (auto *op : ops) {
             addOp(op);
         }
+    }
+
+    BasicBlock(int64_t id, std::string_view name) : _id(id), _name(name) {}
+    BasicBlock(int64_t id, std::string_view name, std::initializer_list<Op *> ops) : _name(name) {
+        BasicBlock(id, ops);
     }
 
     void addPred(BasicBlock *bb) { _preds.push_back(bb); }
@@ -103,20 +121,24 @@ class BasicBlock {
             _preds.erase(iter);
         }
     }
+
     void setSucc(BasicBlock *bb) { _cond_succ.T = bb; }
     void setCondFailSucc(BasicBlock *bb) { _cond_succ.F = bb; }
 
-  public:
-    static BasicBlock *create(std::string_view name) { return new BasicBlock(name); }
+    // live at entry of this block
+    std::set<Op*> liveIn;
 
-    static BasicBlock *create(std::string_view name, std::initializer_list<Op *> ops) {
-        return new BasicBlock(name, ops);
+  public:
+    static BasicBlock *create(int64_t id, std::string_view name) { return new BasicBlock(id, name); }
+
+    static BasicBlock *create(int64_t id, std::string_view name, std::initializer_list<Op *> ops) {
+        return new BasicBlock(id, name, ops);
     }
 
     auto insertOp(std::list<opPtr>::const_iterator pos, Op *op) {
         auto ret = _ops.insert(pos, opPtr(op));
         op->setBB(this);
-        op->setId(_ops_free_id++);
+        op->setBlockId(_ops_free_id++);
         return ret;
     }
 
@@ -166,7 +188,11 @@ class BasicBlock {
         }
     }
 
-    const std::string_view getName() const { return _name; }
+    bool hasName() const { return _name.has_value(); }
+
+    const std::string_view getName() const { return _name.value(); }
+
+    int64_t getId() const { return _id; }
 
     const std::pair<BasicBlock *, BasicBlock *> getSuccessors() const {
         return std::pair(_cond_succ.T, _cond_succ.F);
@@ -177,7 +203,12 @@ class BasicBlock {
     friend std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
         auto printName = [](decltype(bb._preds.begin()) i) { return (*i)->getName(); };
 
-        os << bb.getName();
+        if (bb.hasName()) {
+            os << bb.getName();
+        } else {
+            os << bb.getId();
+        }
+
         printWithSeparator(os, bb._preds.begin(), bb._preds.end(), printName, " (Preds: ", ", ",
                            ") ");
 
@@ -195,18 +226,20 @@ class BasicBlock {
     const std::list<opPtr> &getOps() { return _ops; }
 
     void sort() {
-        auto cmp = [](opPtr &a, opPtr &b) { return a->getId() < b->getId(); };
+        auto cmp = [](opPtr &a, opPtr &b) { return a->getBlockId() < b->getBlockId(); };
         _ops.sort(cmp);
     }
+
+    std::set<Op*>& getLiveIn() { return liveIn; }
 };
 
 class Rewriter {
-    std::unique_ptr<BasicBlock> _bb;
+    BasicBlock *_bb;
     std::list<std::unique_ptr<Op>>::const_iterator _insertPoint;
 
   public:
-    Rewriter(std::string_view name, std::initializer_list<IR::Op *> ops)
-        : _bb(BasicBlock::create(name, ops)), _insertPoint(_bb->getOps().end()) {}
+    Rewriter(int64_t id, std::string_view name, std::initializer_list<IR::Op *> ops)
+        : _bb(BasicBlock::create(id, name, ops)), _insertPoint(_bb->getOps().end()) {}
 
     template <typename OpTy, typename... Args>
         requires requires(Type ty, Args... args) { Op::create<OpTy>(ty, args...); }
@@ -216,29 +249,27 @@ class Rewriter {
         return op;
     }
 
-    auto operator->() { return _bb.get(); }
+    auto operator->() { return _bb; }
 
-    BasicBlock *bb() { return _bb.get(); }
+    BasicBlock *bb() { return _bb; }
 
     auto &operator*() { return *_bb; }
 
     friend std::ostream &operator<<(std::ostream &os, const Rewriter &r) { return os << *r._bb; }
 };
 
+void postorder(BasicBlock *bb, std::function<void(BasicBlock *)> fn);
+
 class Function {
     std::string _name;
-    std::set<BasicBlock *> _bbs;
+    std::set<BasicBlock*> _bbs;
 
   public:
     Function(const std::string_view name) : _name(name) {}
-    Function(const std::string_view name, const std::set<BasicBlock *> &basicBlocks)
-        : _name(name), _bbs(basicBlocks) {}
-    Function(const std::string_view name, std::initializer_list<BasicBlock *> basicBlocks)
-        : _name(name), _bbs(basicBlocks) {}
 
     const std::string &getName() const { return _name; }
 
-    const std::set<BasicBlock *> &getBBs() const { return _bbs; }
+    const std::set<BasicBlock*> &getBBs() const { return _bbs; }
 
     void setName(const std::string_view name) { _name = name; }
 
@@ -250,6 +281,31 @@ class Function {
             os << *bb << "\n";
         }
         return os;
+    }
+
+    void assignGlobalIds(BasicBlock* entry) {
+        std::vector<BasicBlock*> rpo;
+        std::unordered_set<BasicBlock*> visited;
+
+        std::vector<BasicBlock*> allNodesPostorder;
+        auto savePO = [&allNodesPostorder](BasicBlock* bb){ allNodesPostorder.push_back(bb); };
+        postorder(entry, savePO);
+
+        std::reverse(allNodesPostorder.begin(), allNodesPostorder.end()); // now reverse postorder
+
+        int64_t nextId = 0;
+        for (auto* bb : rpo) {
+            for (auto& opPtr : bb->getOps()) {
+                opPtr->setGlobalId(nextId++);
+            }
+        }
+    }
+
+    // FIXME: this is bullshit
+    ~Function() {
+        for (auto *bb: _bbs) {
+            delete bb;
+        }
     }
 };
 

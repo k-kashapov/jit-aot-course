@@ -2,21 +2,23 @@
 #include <operations.h>
 #include <types.h>
 
-namespace IR {
+using namespace IR;
 
-Function *buildFibonacci() {
-    auto *func = new Function("fibonacci");
+Function buildFibonacci() {
+    auto func = Function("fibonacci");
+
+    int64_t id = 0;
 
     // Create blocks
-    auto *entry = BasicBlock::create("entry");
-    auto *header = BasicBlock::create("loop_header");
-    auto *body = BasicBlock::create("loop_body");
-    auto *exit = BasicBlock::create("exit");
+    auto *entry = BasicBlock::create(id++, "entry");
+    auto *header = BasicBlock::create(id++, "loop_header");
+    auto *body = BasicBlock::create(id++, "loop_body");
+    auto *exit = BasicBlock::create(id++, "exit");
 
-    func->addBB(entry);
-    func->addBB(header);
-    func->addBB(body);
-    func->addBB(exit);
+    func.addBB(entry);
+    func.addBB(header);
+    func.addBB(body);
+    func.addBB(exit);
 
     // ---------- Entry ----------
     auto *n = Op::create<ParamOp>(EType::SI32);
@@ -72,10 +74,8 @@ Function *buildFibonacci() {
     return func;
 }
 
-} // namespace IR
-
 int main() {
-    auto fib = std::unique_ptr<IR::Function>(IR::buildFibonacci());
-    std::cout << *fib << std::endl;
+    auto fib = buildFibonacci();
+    std::cout << fib << std::endl;
     return 0;
 }

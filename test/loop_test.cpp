@@ -1,7 +1,7 @@
 #include <cassert>
 #include <loop.h>
 
-#define MAKE_BB(NAME) auto NAME = IR::Rewriter(#NAME, {}); func.addBB(NAME.bb())
+#define MAKE_BB(NAME) auto NAME = IR::Rewriter(id++, #NAME, {}); func.addBB(NAME.bb())
 
 void printMap(IR::LoopMap loops) {
     for (auto iter : loops) {
@@ -26,6 +26,7 @@ void printMap(IR::LoopMap loops) {
 }
 
 void test1() {
+    int64_t id = 0;
     IR::Function func("test1");
 
     MAKE_BB(a);
@@ -50,6 +51,7 @@ void test1() {
 }
 
 void test2() {
+    int64_t id = 0;
     IR::Function func("test2");
 
     MAKE_BB(a);
@@ -90,6 +92,7 @@ void test2() {
 }
 
 void test3() {
+    int64_t id = 0;
     IR::Function func("test3");
 
     MAKE_BB(a);
@@ -129,6 +132,7 @@ void test3() {
 }
 
 void test4() {
+    int64_t id = 0;
     IR::Function func("test4");
 
     MAKE_BB(a);
@@ -150,6 +154,7 @@ void test4() {
 }
 
 void test5() {
+    int64_t id = 0;
     IR::Function func("test5");
 
     MAKE_BB(a);
@@ -174,6 +179,7 @@ void test5() {
 }
 
 void test6() {
+    int64_t id = 0;
     IR::Function func("test6");
 
     MAKE_BB(a);

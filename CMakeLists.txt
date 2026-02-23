@@ -12,3 +12,4 @@ set(BIN_DIR ${PROJECT_SOURCE_DIR}/bin)
 set(LIB_DIR ${PROJECT_SOURCE_DIR}/src)
 
 add_subdirectory(test)
+add_subdirectory(src)
