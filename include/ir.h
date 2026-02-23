@@ -85,6 +85,13 @@ class Op {
     void setGlobalId(int64_t id) { _globalId = id; }
     int64_t getGlobalId() const { return _globalId; }
 
+    virtual std::vector<Op*> getOperands() const { 
+        return {};
+    }
+
+    template <typename ConcreteOp>
+    bool is() { return dynamic_cast<ConcreteOp*>(this) != nullptr; }
+
     virtual ~Op() {};
 };
 
@@ -284,18 +291,21 @@ class Function {
     }
 
     void assignGlobalIds(BasicBlock* entry) {
-        std::vector<BasicBlock*> rpo;
         std::unordered_set<BasicBlock*> visited;
 
-        std::vector<BasicBlock*> allNodesPostorder;
-        auto savePO = [&allNodesPostorder](BasicBlock* bb){ allNodesPostorder.push_back(bb); };
+        std::vector<BasicBlock*> rpo;
+        auto savePO = [&rpo](BasicBlock* bb){ 
+            rpo.push_back(bb);
+        };
         postorder(entry, savePO);
 
-        std::reverse(allNodesPostorder.begin(), allNodesPostorder.end()); // now reverse postorder
+        std::reverse(rpo.begin(), rpo.end()); // now reverse postorder
 
         int64_t nextId = 0;
         for (auto* bb : rpo) {
-            for (auto& opPtr : bb->getOps()) {
+
+            for (auto &opPtr : bb->getOps()) {
+                // std::cerr << *opPtr << "\n";
                 opPtr->setGlobalId(nextId++);
             }
         }

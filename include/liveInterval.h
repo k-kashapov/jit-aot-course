@@ -19,16 +19,13 @@ public:
 
         // Compute reverse postorder again for processing (could reuse but we need order vector)
         std::vector<BasicBlock*> order;
-        std::unordered_set<BasicBlock*> visited;
-        std::function<void(BasicBlock*)> dfs = [&](BasicBlock* bb) {
-            visited.insert(bb);
-            auto succs = bb->getSuccessors();
-            if (succs.first && !visited.count(succs.first)) dfs(succs.first);
-            if (succs.second && !visited.count(succs.second)) dfs(succs.second);
+        std::cerr << "postorder:\n";
+        auto savePO = [&order](BasicBlock* bb){ 
+            std::cerr << '\t' << bb->getName() << "\n";
             order.push_back(bb);
         };
-        dfs(entry);
-        std::reverse(order.begin(), order.end()); // order = reverse postorder (entry → exit)
+
+        postorder(entry, savePO);
 
         // Get loop information using existing detection
         auto loopMap = IR::FindAllLoops(*func, entry);
@@ -38,20 +35,23 @@ public:
             if (bb->getOps().empty()) return -1;
             return bb->getOps().front()->getGlobalId();
         };
+
         auto blockEnd = [](BasicBlock* bb) -> int64_t {
             if (bb->getOps().empty()) return -1;
             return bb->getOps().back()->getGlobalId();
         };
 
         // Process blocks in reverse order (exit → entry)
-        for (auto it = order.rbegin(); it != order.rend(); ++it) {
+        for (auto it = order.begin(); it != order.end(); ++it) {
             BasicBlock* b = *it;
 
             // live = union of successors' liveIn
             std::set<Op*> live;
             auto succs = b->getSuccessors();
             for (auto* succ : {succs.first, succs.second}) {
-                if (succ) live.insert(succ->liveIn.begin(), succ->liveIn.end());
+                if (succ) {
+                    live.insert(succ->getLiveIn().begin(), succ->getLiveIn().end());
+                }
             }
 
             // Add phi inputs from successors
@@ -62,14 +62,18 @@ public:
                     if (op->is<PhiNode>()) {
                         PhiNode* phi = static_cast<PhiNode*>(op);
                         Op* input = phi->getInputForPredecessor(b);
-                        if (input) live.insert(input);
+                        if (input) {
+                            live.insert(input);
+                        }
                     }
                 }
             }
 
             int64_t b_from = blockStart(b);
             int64_t b_to   = blockEnd(b);
-            if (b_from == -1) continue; // empty block (should not happen)
+            if (b_from == -1) {
+                continue; // empty block (should not happen)
+            }
 
             // Extend intervals for currently live variables across whole block
             for (Op* opd : live) {
@@ -83,7 +87,14 @@ public:
                 int64_t opId = op->getGlobalId();
 
                 // Output operand (the op itself)
-                intervals[op].emplace_back(opId, opId);
+                if (intervals[op].empty()) {
+                    intervals[op].emplace_back(opId, opId);
+                } else {
+                    for (auto &range : intervals[op]) {
+                        range.first = opId;
+                    }
+                }
+
                 live.erase(op);
 
                 // Input operands
@@ -97,7 +108,7 @@ public:
             // Remove phi outputs of this block
             for (auto& opPtr : ops) {
                 Op* op = opPtr.get();
-                if (op->isPhi()) {
+                if (op->is<PhiNode>()) {
                     live.erase(op);
                 }
             }
@@ -133,7 +144,7 @@ public:
 
     void print(std::ostream& os) const {
         for (auto& [op, vec] : intervals) {
-            os << "Op $" << op->getLocalId() << " (global " << op->getGlobalId()
+            os << "Op $" << op->getBlockId() << " (global " << op->getGlobalId()
                << ", type " << op->getType() << "): ";
             for (auto& [start, end] : vec) {
                 os << "[" << start << ", " << end << "] ";
