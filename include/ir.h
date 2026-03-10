@@ -237,6 +237,17 @@ class BasicBlock {
     }
 
     std::set<Op *> &getLiveIn() { return liveIn; }
+
+    int64_t blockStart() {
+        if (getOps().empty())
+            return -1;
+        return getOps().front()->getGlobalId();
+    };
+    int64_t blockEnd() {
+        if (getOps().empty())
+            return -1;
+        return getOps().back()->getGlobalId();
+    };
 };
 
 class Rewriter {

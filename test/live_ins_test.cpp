@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "ir.h"
-#include "liveInterval.h"
+#include "live_interval.h"
 #include "loop.h"
 #include "operations.h"
 
@@ -84,13 +84,11 @@ void test2() {
     MAKE_BB(ifT);
     MAKE_BB(ifF);
     MAKE_BB(merge);
-    MAKE_BB(exit);
 
     entry.bb()->linkTrue(ifT.bb());
     entry.bb()->linkFalse(ifF.bb());
     ifT.bb()->linkTrue(merge.bb());
     ifF.bb()->linkTrue(merge.bb());
-    merge.bb()->linkTrue(exit.bb());
 
     auto *cond = entry.createOp<IR::ConstOp>(IR::EType::BOOL, 1);
     entry.createOp<IR::CondBrOp>(IR::EType::None, cond, ifT.bb());
@@ -106,7 +104,7 @@ void test2() {
     phi->addSource(ifT.bb(), xT);
     phi->addSource(ifF.bb(), xF);
 
-    auto *ret = exit.createOp<IR::RetOp>(IR::EType::None, phi);
+    auto *ret = merge.createOp<IR::RetOp>(IR::EType::None, phi);
 
     func.assignGlobalIds(entry.bb());
     std::cerr << func << "\n";
@@ -115,15 +113,32 @@ void test2() {
     analyzer.analyze(&func, entry.bb());
     analyzer.print(std::cerr);
 
+    // Check that both xT and xF have an interval ending at the phi
+    int64_t phi_id = phi->getGlobalId();
     int64_t ret_id = ret->getGlobalId();
-    bool phi_def = false, phi_use = false;
-    for (auto &iv : analyzer.intervals[phi]) {
-        if (iv.first == phi_id && iv.second == phi_id)
-            phi_def = true;
-        if (iv.first == ret_id && iv.second == ret_id)
-            phi_use = true;
+
+    bool foundT = false, foundF = false;
+    for (auto &ival : analyzer.intervals[xT]) {
+        if (ival.second == phi_id)
+            foundT = true;
     }
-    assert(phi_def && phi_use);
+    assert(foundT);
+
+    for (auto &ival : analyzer.intervals[xF]) {
+        if (ival.second == phi_id)
+            foundF = true;
+    }
+    assert(foundF);
+
+    // phi's own live range should cover its definition and its use in ret
+    bool foundPhiDef = false, foundPhiUse = false;
+    for (auto &ival : analyzer.intervals[phi]) {
+        if (ival.first <= phi_id && ival.second >= phi_id)
+            foundPhiDef = true;
+        if (ival.first <= ret_id && ival.second >= ret_id)
+            foundPhiUse = true;
+    }
+    assert(foundPhiDef && foundPhiUse);
 }
 
 void test3() {
