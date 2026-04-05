@@ -84,6 +84,9 @@ int test1() {
     }
 
     std::cout << "\nAfter inlining:\n" << caller << std::endl;
+
+    assert(caller.getBBs().size() == 3);
+    assert(addFunc.getBBs().size() == 0);
     return 0;
 }
 
@@ -166,6 +169,9 @@ int test2() {
         std::cerr << "Inlining failed!" << std::endl;
     else
         std::cout << "\nAfter inlining:\n" << caller << std::endl;
+
+    assert(caller.getBBs().size() == 5);
+    assert(maxFunc.getBBs().size() == 0);
 
     return 0;
 }
