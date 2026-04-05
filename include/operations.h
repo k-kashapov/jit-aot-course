@@ -47,6 +47,12 @@ class BinaryOp : public Op {
     BinaryOp(Op *lhs, Op *rhs) : _lhs(lhs), _rhs(rhs) {}
 
     std::vector<Op *> getOperands() const override { return {_lhs, _rhs}; }
+    virtual void replaceOperand(Op *from, Op *to) override {
+        if (_lhs == from)
+            _lhs = to;
+        if (_rhs == from)
+            _rhs = to;
+    }
 
     Op *getLhs() const { return _lhs; }
 
@@ -95,6 +101,16 @@ class PhiNode : public Op {
         };
     }
 
+    template <typename IteratorT> PhiNode(const IteratorT begin, const IteratorT end) {
+        _sources.reserve(std::distance(begin, end));
+        for (auto iter = begin; iter != end; iter++) {
+            Op *op = *iter;
+            assert(op->getBB() != nullptr &&
+                   "Operation must have basic block assigned to be added to phi node\n");
+            _sources.push_back(Source{op->getBB(), op});
+        };
+    }
+
     std::vector<Op *> getOperands() const override {
         std::vector<Op *> res;
         res.reserve(_sources.size());
@@ -102,6 +118,14 @@ class PhiNode : public Op {
             res.push_back(source.second);
         }
         return res;
+    }
+
+    virtual void replaceOperand(Op *from, Op *to) override {
+        for (auto &src : _sources) {
+            if (src.second == from) {
+                src = Source{to->getBB(), to};
+            }
+        }
     }
 
     using const_iterator = std::vector<Source>::const_iterator;
@@ -189,6 +213,11 @@ class CondBrOp : public Op {
 
     std::vector<Op *> getOperands() const override { return {_cond}; }
 
+    virtual void replaceOperand(Op *from, Op *to) override {
+        if (_cond == from)
+            _cond = to;
+    }
+
     virtual void setBB(BasicBlock *bb) override {
         _bb = bb;
         _bb->linkTrue(_dest);
@@ -218,7 +247,7 @@ class ConstOp : public Op {
 };
 
 class CallOp : public Op {
-    BasicBlock *_dest = nullptr;
+    Function *_dest = nullptr;
     std::list<Op *> _params;
 
     virtual std::ostream &stringify(std::ostream &os) const override {
@@ -237,19 +266,24 @@ class CallOp : public Op {
     }
 
   public:
-    CallOp(BasicBlock *dest) : _dest(dest) {}
-    CallOp(BasicBlock *dest, IR::OpRange params) : _dest(dest), _params(params) {}
+    CallOp(Function *dest) : _dest(dest) {}
+    CallOp(Function *dest, IR::OpRange params) : _dest(dest), _params(params) {}
 
     std::vector<Op *> getOperands() const override { return {_params.begin(), _params.end()}; }
 
-    BasicBlock *getDest() const { return _dest; }
-
-    void setDest(BasicBlock *bb) { _dest = bb; }
-
-    virtual void setBB(BasicBlock *bb) override {
-        _bb = bb;
-        _bb->linkTrue(_dest);
+    virtual void replaceOperand(Op *from, Op *to) override {
+        for (auto &op : _params) {
+            if (op == from) {
+                op = to;
+            }
+        }
     }
+
+    Function *getDest() const { return _dest; }
+
+    void setDest(Function *func) { _dest = func; }
+
+    virtual void setBB(BasicBlock *bb) override { _bb = bb; }
 
     virtual bool verify() const override { return _dest != nullptr; }
 };
@@ -269,6 +303,11 @@ class RetOp : public Op {
 
     Op *getValue() const { return _val; }
     void setValue(Op *val) { _val = val; }
+
+    virtual void replaceOperand(Op *from, Op *to) override {
+        if (_val == from)
+            _val = to;
+    }
 
     virtual bool verify() const override { return _val->verify(); }
 };

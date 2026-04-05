@@ -1,2 +1,5 @@
 include_directories(${INCLUDE_DIR})
-add_library(IR ir.cpp)
+
+file(GLOB LIB_FILES *.cpp)
+
+add_library(IR ${LIB_FILES})

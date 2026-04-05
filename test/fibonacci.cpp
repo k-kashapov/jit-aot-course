@@ -71,6 +71,8 @@ Function buildFibonacci() {
     curr_phi->addSource(entry, one);
     curr_phi->addSource(body, new_val);
 
+    func.assignGlobalIds(entry);
+
     return func;
 }
 

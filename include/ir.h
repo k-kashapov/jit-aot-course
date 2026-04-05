@@ -51,6 +51,8 @@ class Op {
     BasicBlock *_bb;
     Type _type;
 
+    std::list<Op *> _users;
+
     Op() : _blockId(-1), _bb(nullptr), _type(EType::SI32) {};
     Op(int64_t id) : _blockId(id), _bb(nullptr), _type(EType::SI32) {}
 
@@ -60,8 +62,11 @@ class Op {
     template <typename Ty, class... Args>
         requires std::is_base_of_v<Op, Ty>
     static Ty *create(Type ty, Args... args) {
-        auto res = new Ty(args...);
+        Ty *res = new Ty(args...);
         res->_type = ty;
+        for (auto op : res->getOperands()) {
+            op->addUser(res);
+        }
         return res;
     }
 
@@ -86,6 +91,17 @@ class Op {
     int64_t getGlobalId() const { return _globalId; }
 
     virtual std::vector<Op *> getOperands() const { return {}; }
+    virtual void replaceOperand([[maybe_unused]] Op *from, [[maybe_unused]] Op *to) {};
+
+    void addUser(Op *user) { _users.push_back(user); }
+
+    std::list<Op *> &getUsers() { return _users; }
+
+    void replaceAllUsesWith(Op *replacement) {
+        for (auto *user : _users) {
+            user->replaceOperand(this, replacement);
+        }
+    }
 
     template <typename ConcreteOp> bool is() { return dynamic_cast<ConcreteOp *>(this) != nullptr; }
 
@@ -161,9 +177,22 @@ class BasicBlock {
         return insertOp(iter, op);
     }
 
+    auto insertOpFront(Op *op) {
+        auto ret = insertOp(_ops.begin(), op);
+        return ret;
+    }
+
     std::list<opPtr>::iterator addOp(Op *op) {
         auto ret = insertOp(_ops.end(), op);
         return ret;
+    }
+
+    void removeOp(Op *op) {
+        auto iter = std::find_if(_ops.begin(), _ops.end(),
+                                 [op](std::unique_ptr<Op> &uptr) { return uptr.get() == op; });
+        if (iter != _ops.end()) {
+            _ops.erase(iter);
+        }
     }
 
     void linkTrue(BasicBlock *bb) {
@@ -196,8 +225,9 @@ class BasicBlock {
 
     bool hasName() const { return _name.has_value(); }
 
-    const std::string_view getName() const { return _name.value(); }
+    const std::string getName() const { return (_name.has_value() ? _name.value() : "unnamed"); }
 
+    void setId(int64_t id) { _id = id; }
     int64_t getId() const { return _id; }
 
     const std::pair<BasicBlock *, BasicBlock *> getSuccessors() const {
@@ -207,7 +237,10 @@ class BasicBlock {
     const std::vector<BasicBlock *> &getPreds() const { return _preds; }
 
     friend std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
-        auto printName = [](decltype(bb._preds.begin()) i) { return (*i)->getName(); };
+        auto printName = [](decltype(bb._preds.begin()) i) {
+            BasicBlock *bb = *i;
+            return bb->getName();
+        };
 
         if (bb.hasName()) {
             os << bb.getName();
@@ -248,6 +281,36 @@ class BasicBlock {
             return -1;
         return getOps().back()->getGlobalId();
     };
+
+    BasicBlock *splitAt(Op *pos) {
+        auto iter = _ops.begin();
+        for (; iter != _ops.end(); iter++) {
+            if (iter->get() == pos) {
+                break;
+            }
+        }
+
+        if (iter == _ops.end()) {
+            return nullptr;
+        }
+
+        BasicBlock *newBlock = new BasicBlock(-1, getName() + "_split");
+        // for (auto it = iter; it != _ops.end(); it++) {
+
+        // }
+
+        newBlock->_ops.splice(newBlock->_ops.begin(), _ops, iter, _ops.end());
+
+        if (_cond_succ.T)
+            newBlock->linkTrue(_cond_succ.T);
+        if (_cond_succ.F)
+            newBlock->linkFalse(_cond_succ.F);
+
+        linkTrue(newBlock);
+        _cond_succ.F = nullptr;
+
+        return newBlock;
+    }
 };
 
 class Rewriter {
@@ -289,17 +352,20 @@ class Function {
     std::string _name;
     std::set<BasicBlock *> _bbs;
     BasicBlock *_entry = nullptr;
+    std::set<BasicBlock *> _exits;
 
   public:
     Function(const std::string_view name) : _name(name) {}
 
     const std::string &getName() const { return _name; }
 
-    const std::set<BasicBlock *> &getBBs() const { return _bbs; }
+    std::set<BasicBlock *> &getBBs() { return _bbs; }
 
     void setName(const std::string_view name) { _name = name; }
 
-    void addBB(BasicBlock *bb) { _bbs.insert(bb); }
+    void addBB(BasicBlock *bb);
+
+    void removeBB(BasicBlock *bb) { _bbs.erase(bb); }
 
     friend std::ostream &operator<<(std::ostream &os, const Function &f) {
         os << "Function " << f._name << "\n";
@@ -339,6 +405,33 @@ class Function {
             }
         }
     }
+
+    void assignGlobalIds() {
+        if (!_entry) {
+            throw std::runtime_error("entry not set!");
+        }
+        assignGlobalIds(_entry);
+    }
+
+    void assignBlockIds() {
+        int64_t id = 0;
+        auto setId = [&id](BasicBlock *bb) { bb->setId(id++); };
+        postorder(_entry, setId);
+    }
+
+    BasicBlock *getEntry() { return _entry; }
+
+    void setEntry(BasicBlock *bb) { _entry = bb; }
+
+    size_t getNumOps() {
+        size_t res = 0;
+        for (auto *bb : _bbs) {
+            res += bb->getOps().size();
+        }
+        return res;
+    }
+
+    std::set<BasicBlock *> &getExits() { return _exits; }
 
     // FIXME: this is bullshit
     ~Function() {
