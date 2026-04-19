@@ -1,8 +1,8 @@
 #include <cassert>
+#include <checks.h>
 #include <iostream>
 #include <ir.h>
 #include <operations.h>
-#include <checks.h>
 
 using namespace IR;
 
@@ -26,7 +26,8 @@ void test_same_block() {
     optimizeChecks(&f);
     int cnt = 0;
     for (auto &op : entry->getOps())
-        if (op->is<NullCheck>()) cnt++;
+        if (op->is<NullCheck>())
+            cnt++;
     assert(cnt == 1);
 
     std::cerr << "AFTER OPT:\n" << f << "\n";
@@ -81,7 +82,8 @@ void test_bound_merge() {
     optimizeChecks(&f);
     BoundCheck *survivor = nullptr;
     for (auto &op : entry->getOps())
-        if ((survivor = dynamic_cast<BoundCheck*>(op.get()))) break;
+        if ((survivor = dynamic_cast<BoundCheck *>(op.get())))
+            break;
     assert(survivor);
     assert(survivor->getLower() == 3);
     assert(survivor->getUpper() == 8);
@@ -129,9 +131,11 @@ void test_diamond_no_opt() {
     // Neither block dominates the other, so both checks survive
     bool hasLeft = false, hasRight = false;
     for (auto &op : left->getOps())
-        if (op->is<NullCheck>()) hasLeft = true;
+        if (op->is<NullCheck>())
+            hasLeft = true;
     for (auto &op : right->getOps())
-        if (op->is<NullCheck>()) hasRight = true;
+        if (op->is<NullCheck>())
+            hasRight = true;
     assert(hasLeft && hasRight);
 }
 
