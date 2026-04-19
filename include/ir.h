@@ -367,15 +367,24 @@ class Function {
 
     void removeBB(BasicBlock *bb) { _bbs.erase(bb); }
 
+    std::vector<BasicBlock *> getBBPostOrder() const {
+        std::vector<BasicBlock *> po;
+        auto savePO = [&po](BasicBlock *bb) { po.push_back(bb); };
+        postorder(_entry, savePO);
+        return po;
+    }
+
+    std::vector<BasicBlock *> getBBRPO() const {
+        auto rpo = getBBPostOrder();
+        std::reverse(rpo.begin(), rpo.end()); // now reverse postorder
+        return rpo;
+    }
+
     friend std::ostream &operator<<(std::ostream &os, const Function &f) {
         os << "Function " << f._name << "\n";
 
         if (f._entry) {
-            std::vector<BasicBlock *> rpo;
-            auto savePO = [&rpo](BasicBlock *bb) { rpo.push_back(bb); };
-            postorder(f._entry, savePO);
-
-            std::reverse(rpo.begin(), rpo.end()); // now reverse postorder
+            std::vector<BasicBlock *> rpo = f.getBBRPO();
             for (auto *bb : rpo) {
                 os << *bb << "\n";
             }
@@ -390,11 +399,7 @@ class Function {
 
     void assignGlobalIds(BasicBlock *entry) {
         _entry = entry;
-        std::vector<BasicBlock *> rpo;
-        auto savePO = [&rpo](BasicBlock *bb) { rpo.push_back(bb); };
-        postorder(entry, savePO);
-
-        std::reverse(rpo.begin(), rpo.end()); // now reverse postorder
+        auto rpo = getBBRPO();
 
         int64_t nextId = 0;
         for (auto *bb : rpo) {
